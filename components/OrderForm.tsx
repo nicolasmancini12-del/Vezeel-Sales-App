@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure } from '../types';
-import { X, Sparkles, Loader2, Calendar } from 'lucide-react';
+import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment } from '../types';
+import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { analyzeTextForOrder } from '../services/geminiService';
 import { getClients, getContractors, getPriceList, getCompanies, getWorkflow, getUnits } from '../services/storageService';
 
@@ -10,9 +10,10 @@ interface Props {
   onClose: () => void;
   onSubmit: (data: Order) => void;
   initialData?: Order | null;
+  currentUser?: User | null;
 }
 
-const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) => {
+const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, currentUser }) => {
   // Master data state
   const [clients, setClients] = useState<Client[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -30,19 +31,25 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
     clientId: '',
     poNumber: '',
     serviceName: '',
-    serviceDetails: '', // NEW Field
+    serviceDetails: '',
     unitOfMeasure: 'Horas',
     quantity: 1,
     unitPrice: 0,
     unitCost: 0,
     contractorId: '',
-    status: '', // Set on load
+    status: '', 
     operationsRep: '',
     observations: '',
     commitmentDate: '',
     clientCertDate: '',
     billingDate: ''
   });
+
+  // New State for History and Attachments
+  const [history, setHistory] = useState<OrderHistoryEntry[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [newAttachmentUrl, setNewAttachmentUrl] = useState('');
+  const [newAttachmentName, setNewAttachmentName] = useState('');
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -56,7 +63,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
         setWorkflow(getWorkflow());
         setUnits(getUnits());
         
-        // Load companies and set default if form is empty
         const comps = getCompanies();
         setCompanies(comps);
         if (!initialData && comps.length > 0 && !formData.company) {
@@ -65,7 +71,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
     }
   }, [isOpen]);
 
-  // Set default status and default unit if new
+  // Set default status/unit
   useEffect(() => {
       if (!initialData && !formData.status && workflow.length > 0) {
           setFormData(prev => ({ 
@@ -76,22 +82,14 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
       }
   }, [workflow, initialData, formData.status, units]);
 
-  // Filter Price List when Company, Client or Contractor changes
+  // Filter Price List
   useEffect(() => {
     const filtered = priceList.filter(p => {
-        // Filter by company name matching
         if (p.company !== formData.company) return false;
-        
-        // Filter by contractor (if specific price exists for that contractor)
         if (p.contractorId && formData.contractorId && p.contractorId !== formData.contractorId) return false;
-        
-        // Filter by Client (New Logic)
         if (p.clientId && formData.clientId && p.clientId !== formData.clientId) return false;
-        
-        // Date Check
         const orderDate = formData.date;
         if (orderDate < p.validFrom || orderDate > p.validTo) return false;
-        
         return true;
     });
     setAvailableServices(filtered);
@@ -100,16 +98,17 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
   // Load initial data
   useEffect(() => {
     if (initialData) {
-      const { id, totalValue, clientName, contractorName, ...rest } = initialData;
+      const { id, totalValue, clientName, contractorName, history: initHistory, attachments: initAttachments, ...rest } = initialData;
       setFormData({
           ...rest,
-          unitCost: initialData.unitCost || 0, // Ensure cost is loaded
+          unitCost: initialData.unitCost || 0,
           commitmentDate: initialData.commitmentDate || '',
           clientCertDate: initialData.clientCertDate || '',
           billingDate: initialData.billingDate || ''
       });
+      setHistory(initHistory || []);
+      setAttachments(initAttachments || []);
     } else {
-        // Reset to defaults but keep company if loaded
         setFormData(prev => ({
             date: new Date().toISOString().split('T')[0],
             company: prev.company,
@@ -129,53 +128,44 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
             clientCertDate: '',
             billingDate: ''
         }));
+        setHistory([]);
+        setAttachments([]);
     }
+    setNewAttachmentUrl('');
+    setNewAttachmentName('');
   }, [initialData, isOpen, workflow, units]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
-    setFormData(prev => {
-        const newData = {
-            ...prev,
-            [name]: name === 'quantity' || name === 'unitPrice' ? parseFloat(value) || 0 : value
-        };
-        return newData;
-    });
+    setFormData(prev => ({
+        ...prev,
+        [name]: name === 'quantity' || name === 'unitPrice' ? parseFloat(value) || 0 : value
+    }));
   };
 
-  // Logic to auto-select price if service name matches a catalog entry
   const handleServiceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       let update = { serviceName: val } as Partial<typeof formData>;
-
-      // Try to find price match
       const match = availableServices.find(s => s.serviceName === val);
       if (match) {
           update.unitPrice = match.unitPrice;
-          update.unitCost = match.contractorCost || 0; // Capture cost automatically
+          update.unitCost = match.contractorCost || 0; 
           update.unitOfMeasure = match.unitOfMeasure;
-          // Optionally auto-select contractor if locked in price list
           if(match.contractorId) update.contractorId = match.contractorId;
       }
-      
       setFormData(prev => ({ ...prev, ...update }));
   }
 
   const handleAiAssist = async () => {
     if (!aiPrompt.trim()) return;
     setIsThinking(true);
-    
     const result = await analyzeTextForOrder(aiPrompt);
-    
     if (result) {
-        // Try to fuzzy match client name to ID
         let foundClientId = formData.clientId;
         if (result.client) {
             const clientMatch = clients.find(c => c.name.toLowerCase().includes(result.client.toLowerCase()));
             if (clientMatch) foundClientId = clientMatch.id;
         }
-
         setFormData(prev => ({
             ...prev,
             clientId: foundClientId,
@@ -186,8 +176,25 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
             poNumber: result.poNumber || prev.poNumber
         }));
     }
-    
     setIsThinking(false);
+  };
+
+  // Add Attachment Logic
+  const handleAddAttachment = () => {
+      if(!newAttachmentName || !newAttachmentUrl) return;
+      const newAtt: Attachment = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newAttachmentName,
+          url: newAttachmentUrl,
+          date: new Date().toISOString().split('T')[0]
+      };
+      setAttachments([...attachments, newAtt]);
+      setNewAttachmentName('');
+      setNewAttachmentUrl('');
+  };
+
+  const removeAttachment = (id: string) => {
+      setAttachments(attachments.filter(a => a.id !== id));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -197,13 +204,47 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
     const clientObj = clients.find(c => c.id === formData.clientId);
     const contractorObj = contractors.find(c => c.id === formData.contractorId);
 
+    // AUDIT LOG LOGIC
+    let updatedHistory = [...history];
+    const currentUserInitials = currentUser?.name || 'Sistema';
+
+    if (!initialData) {
+        updatedHistory.push({
+            date: new Date().toISOString(),
+            user: currentUserInitials,
+            action: 'Creado',
+            details: 'Pedido registrado en el sistema'
+        });
+    } else {
+        // Check for Status Change
+        if (initialData.status !== formData.status) {
+            updatedHistory.push({
+                date: new Date().toISOString(),
+                user: currentUserInitials,
+                action: 'Cambio Estado',
+                details: `Cambió de "${initialData.status}" a "${formData.status}"`
+            });
+        } 
+        // Generic Edit Log (debounce logic omitted for simplicity, just log edit if not status change)
+        else {
+             updatedHistory.push({
+                date: new Date().toISOString(),
+                user: currentUserInitials,
+                action: 'Editado',
+                details: 'Actualización de datos del pedido'
+            });
+        }
+    }
+
     const orderToSave: Order = {
       ...formData,
-      unitCost: formData.unitCost || 0, // Ensure it's saved
+      unitCost: formData.unitCost || 0,
       id: initialData?.id || Math.random().toString(36).substr(2, 9),
       clientName: clientObj ? clientObj.name : 'Cliente Desconocido',
       contractorName: contractorObj ? contractorObj.name : 'No Asignado',
-      totalValue
+      totalValue,
+      history: updatedHistory,
+      attachments: attachments
     };
     
     onSubmit(orderToSave);
@@ -403,6 +444,65 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
                     ${(formData.quantity * formData.unitPrice).toLocaleString()}
                 </span>
             </div>
+
+            {/* ATTACHMENTS SECTION */}
+            <div className="col-span-1 md:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Documentos y Enlaces</h3>
+            </div>
+            
+            <div className="col-span-1 md:col-span-3">
+                <div className="flex gap-2 mb-2">
+                    <input 
+                        className="flex-1 border p-2 rounded text-sm" 
+                        placeholder="Nombre (ej: OC PDF)"
+                        value={newAttachmentName}
+                        onChange={e => setNewAttachmentName(e.target.value)}
+                    />
+                    <input 
+                        className="flex-1 border p-2 rounded text-sm" 
+                        placeholder="Link / URL (ej: https://drive...)"
+                        value={newAttachmentUrl}
+                        onChange={e => setNewAttachmentUrl(e.target.value)}
+                    />
+                    <button type="button" onClick={handleAddAttachment} className="bg-gray-100 hover:bg-gray-200 p-2 rounded text-gray-600"><Plus size={20}/></button>
+                </div>
+                <div className="space-y-2">
+                    {attachments.map(att => (
+                        <div key={att.id} className="flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-100 text-sm">
+                            <a href={att.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-700 hover:underline">
+                                <Paperclip size={14}/> {att.name}
+                            </a>
+                            <button type="button" onClick={() => removeAttachment(att.id)} className="text-red-500 hover:text-red-700"><X size={14}/></button>
+                        </div>
+                    ))}
+                    {attachments.length === 0 && <p className="text-xs text-gray-400 italic">No hay documentos adjuntos.</p>}
+                </div>
+            </div>
+
+            {/* AUDIT LOG SECTION */}
+            {history.length > 0 && (
+                <div className="col-span-1 md:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
+                    <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Historial de Actividad</h3>
+                </div>
+            )}
+            
+            {history.length > 0 && (
+                <div className="col-span-1 md:col-span-3 max-h-40 overflow-y-auto">
+                    <div className="relative pl-4 border-l-2 border-gray-200 space-y-4">
+                        {[...history].reverse().map((h, i) => (
+                            <div key={i} className="relative">
+                                <div className="absolute -left-[21px] top-1 bg-white border-2 border-gray-300 rounded-full w-3 h-3"></div>
+                                <div className="text-xs text-gray-500 flex items-center gap-2">
+                                    <Clock size={12}/> {new Date(h.date).toLocaleString()} 
+                                    <span className="flex items-center gap-1 font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded"><UserIcon size={10}/> {h.user}</span>
+                                </div>
+                                <div className="text-sm font-medium text-gray-800 mt-0.5">{h.action}</div>
+                                <div className="text-xs text-gray-600">{h.details}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
           </form>
         </div>

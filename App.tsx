@@ -81,7 +81,7 @@ function App() {
             </div>
             <div>
                 <h1 className="text-xl font-bold tracking-tight">NexusOrder</h1>
-                <p className="text-xs text-slate-500">v1.2.0 (Prod)</p>
+                <p className="text-xs text-slate-500">v1.3.0 (Prod)</p>
             </div>
           </div>
         </div>
@@ -226,6 +226,7 @@ function App() {
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleCreateOrder}
         initialData={editingOrder}
+        currentUser={activeUser}
       />
 
     </div>

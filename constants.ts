@@ -131,7 +131,14 @@ export const MOCK_ORDERS = [
     status: 'En Desarrollo',
     operationsRep: 'Carlos Ruiz',
     observations: 'Retraso por acceso a VPN.',
-    commitmentDate: '2023-11-15'
+    commitmentDate: '2023-11-15',
+    history: [
+      { date: '2023-10-01T10:00:00.000Z', user: 'Jane Doe', action: 'Creado', details: 'Pedido registrado' },
+      { date: '2023-10-02T14:30:00.000Z', user: 'Carlos Ruiz', action: 'Cambio Estado', details: 'De "En Análisis" a "En Desarrollo"' }
+    ],
+    attachments: [
+      { id: 'a1', name: 'Orden de Compra PDF', url: '#', date: '2023-10-01' }
+    ]
   },
   {
     id: '1002',
@@ -153,6 +160,10 @@ export const MOCK_ORDERS = [
     operationsRep: 'Maria Gomez',
     observations: 'Esperando feedback de UX.',
     commitmentDate: '2023-12-01',
-    clientCertDate: '2023-12-10'
+    clientCertDate: '2023-12-10',
+    history: [
+       { date: '2023-10-05T09:00:00.000Z', user: 'Jane Doe', action: 'Creado', details: 'Pedido registrado' }
+    ],
+    attachments: []
   }
 ];

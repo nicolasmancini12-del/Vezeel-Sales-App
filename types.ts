@@ -62,6 +62,22 @@ export interface PriceListEntry {
   validTo: string; 
 }
 
+// --- NEW INTERFACES FOR AUDIT & DOCS ---
+
+export interface OrderHistoryEntry {
+  date: string; // ISO Timestamp
+  user: string;
+  action: string; // 'Creado', 'Editado', 'Cambio Estado'
+  details: string;
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  date: string;
+}
+
 export interface Order {
   id: string;
   date: string; // ISO String - Creation Date
@@ -70,7 +86,7 @@ export interface Order {
   clientName: string; 
   poNumber: string; 
   serviceName: string;
-  serviceDetails?: string; // NEW: Optional additional ID or Detail
+  serviceDetails?: string; 
   unitOfMeasure: string; 
   quantity: number;
   unitPrice: number;
@@ -86,9 +102,13 @@ export interface Order {
   commitmentDate?: string; 
   clientCertDate?: string; 
   billingDate?: string;    
+
+  // New Fields
+  history?: OrderHistoryEntry[];
+  attachments?: Attachment[];
 }
 
-export type OrderFormData = Omit<Order, 'id' | 'totalValue' | 'clientName' | 'contractorName'>;
+export type OrderFormData = Omit<Order, 'id' | 'totalValue' | 'clientName' | 'contractorName' | 'history' | 'attachments'>;
 
 export interface DashboardStats {
   totalRevenue: number;

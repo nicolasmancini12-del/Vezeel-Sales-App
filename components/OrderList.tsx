@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Order, Company, User, WorkflowStatus } from '../types';
 import StatusBadge from './StatusBadge';
-import { Edit2, Trash2, Search, Download } from 'lucide-react';
+import { Edit2, Trash2, Search, Download, Paperclip } from 'lucide-react';
 import { getCompanies, getWorkflow } from '../services/storageService';
 import { ROLES } from '../constants';
 import * as XLSX from 'xlsx';
@@ -64,7 +64,8 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
       FechaCompromiso: o.commitmentDate,
       FechaCertificacion: o.clientCertDate,
       FechaFacturacion: o.billingDate,
-      Observaciones: o.observations
+      Observaciones: o.observations,
+      Adjuntos: o.attachments?.map(a => a.name).join(', ') || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -153,7 +154,12 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
             ) : filteredOrders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{order.id}</div>
+                  <div className="flex items-center gap-2">
+                      <div className="text-sm font-medium text-gray-900">{order.id}</div>
+                      {order.attachments && order.attachments.length > 0 && (
+                          <Paperclip size={14} className="text-blue-500" />
+                      )}
+                  </div>
                   <div className="text-sm text-gray-500">{order.date}</div>
                   <div className="text-xs text-gray-400 mt-1">{order.company.split(' ')[0]}</div>
                 </td>

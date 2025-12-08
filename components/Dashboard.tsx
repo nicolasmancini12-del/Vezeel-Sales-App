@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 import { Order } from '../types';
-import { DollarSign, Briefcase, Activity, CheckCircle } from 'lucide-react';
+import { DollarSign, Briefcase, Activity, CheckCircle, TrendingUp } from 'lucide-react';
 
 interface Props {
   orders: Order[];
@@ -14,6 +14,10 @@ interface Props {
 const Dashboard: React.FC<Props> = ({ orders }) => {
   // Calculate Stats
   const totalRevenue = orders.reduce((acc, o) => acc + o.totalValue, 0);
+  const totalCost = orders.reduce((acc, o) => acc + ((o.unitCost || 0) * o.quantity), 0);
+  const totalMargin = totalRevenue - totalCost;
+  const overallMarginPercent = totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0;
+
   const activeOrders = orders.filter(o => o.status !== 'Facturado' && o.status !== 'Certificado').length;
   const completedOrders = orders.filter(o => o.status === 'Facturado').length;
 
@@ -39,7 +43,7 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
     value: statusMap[key]
   }));
 
-  // Data for Revenue Trend (Monthly) - New!
+  // Data for Revenue Trend (Monthly)
   const monthlyRevenue = orders.reduce((acc, order) => {
       const date = new Date(order.date);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -50,16 +54,62 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
   const trendData = Object.keys(monthlyRevenue).sort().map(key => ({
       date: key,
       total: monthlyRevenue[key]
-  })).slice(-6); // Last 6 months
+  })).slice(-6); 
+
+  // --- PROFITABILITY ANALYTICS ---
+
+  // 1. Margin by Client
+  const marginByClient = orders.reduce((acc, order) => {
+      const revenue = order.totalValue;
+      const cost = (order.unitCost || 0) * order.quantity;
+      const margin = revenue - cost;
+      acc[order.clientName] = (acc[order.clientName] || 0) + margin;
+      return acc;
+  }, {} as Record<string, number>);
+
+  const clientMarginData = Object.keys(marginByClient)
+    .map(key => ({ name: key, margin: marginByClient[key] }))
+    .sort((a,b) => b.margin - a.margin)
+    .slice(0, 5); // Top 5
+
+  // 2. Margin by Service
+  const marginByService = orders.reduce((acc, order) => {
+      const revenue = order.totalValue;
+      const cost = (order.unitCost || 0) * order.quantity;
+      const margin = revenue - cost;
+      acc[order.serviceName] = (acc[order.serviceName] || 0) + margin;
+      return acc;
+  }, {} as Record<string, number>);
+
+  const serviceMarginData = Object.keys(marginByService)
+    .map(key => ({ name: key, margin: marginByService[key] }))
+    .sort((a,b) => b.margin - a.margin)
+    .slice(0, 5);
+
+   // 3. Margin by Contractor
+   const marginByContractor = orders.reduce((acc, order) => {
+      const name = order.contractorName || 'No Asignado';
+      const revenue = order.totalValue;
+      const cost = (order.unitCost || 0) * order.quantity;
+      const margin = revenue - cost;
+      acc[name] = (acc[name] || 0) + margin;
+      return acc;
+  }, {} as Record<string, number>);
+
+  const contractorMarginData = Object.keys(marginByContractor)
+    .map(key => ({ name: key, margin: marginByContractor[key] }))
+    .sort((a,b) => b.margin - a.margin)
+    .slice(0, 5);
 
   // Colors
   const PIE_COLORS = ['#fbbf24', '#60a5fa', '#a78bfa', '#818cf8', '#facc15', '#34d399', '#4ade80'];
 
-  const StatCard = ({ title, value, icon: Icon, color }: any) => (
+  const StatCard = ({ title, value, icon: Icon, color, subtext }: any) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-start justify-between">
       <div>
         <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
         <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+        {subtext && <p className="text-xs text-emerald-600 font-medium mt-1">{subtext}</p>}
       </div>
       <div className={`p-3 rounded-lg ${color}`}>
         <Icon className="w-6 h-6 text-white" />
@@ -78,10 +128,11 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
           color="bg-emerald-500" 
         />
         <StatCard 
-          title="Pedidos Totales" 
-          value={orders.length} 
-          icon={Briefcase} 
-          color="bg-blue-500" 
+          title="Rentabilidad (Margen)" 
+          value={`$${totalMargin.toLocaleString()}`} 
+          subtext={`${overallMarginPercent.toFixed(1)}% Margen Promedio`}
+          icon={TrendingUp} 
+          color="bg-emerald-600" 
         />
         <StatCard 
           title="En Proceso" 
@@ -97,7 +148,7 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
         />
       </div>
 
-      {/* Charts Section */}
+      {/* Main Operational Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -143,8 +194,8 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* New Report: Revenue Trend */}
+        
+        {/* Revenue Trend */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
             <h3 className="text-lg font-semibold text-gray-800 mb-6">Tendencia de Ingresos (Últimos 6 Meses)</h3>
             <div className="h-72 w-full">
@@ -162,6 +213,57 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
             </div>
         </div>
       </div>
+
+      {/* PROFITABILITY SECTION */}
+      <h2 className="text-xl font-bold text-gray-900 mt-8 mb-4 border-b pb-2">Análisis de Rentabilidad (Margen Bruto)</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+             <h4 className="text-sm font-bold text-gray-500 uppercase mb-4">Top Clientes (Margen $)</h4>
+             <div className="h-60 w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                     <BarChart data={clientMarginData} layout="vertical">
+                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                         <XAxis type="number" hide />
+                         <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} interval={0} />
+                         <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
+                         <Bar dataKey="margin" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                     </BarChart>
+                 </ResponsiveContainer>
+             </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+             <h4 className="text-sm font-bold text-gray-500 uppercase mb-4">Top Servicios (Margen $)</h4>
+             <div className="h-60 w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                     <BarChart data={serviceMarginData} layout="vertical">
+                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                         <XAxis type="number" hide />
+                         <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} interval={0} />
+                         <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
+                         <Bar dataKey="margin" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                     </BarChart>
+                 </ResponsiveContainer>
+             </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+             <h4 className="text-sm font-bold text-gray-500 uppercase mb-4">Top Contratistas (Margen $)</h4>
+             <div className="h-60 w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                     <BarChart data={contractorMarginData} layout="vertical">
+                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                         <XAxis type="number" hide />
+                         <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} interval={0} />
+                         <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
+                         <Bar dataKey="margin" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
+                     </BarChart>
+                 </ResponsiveContainer>
+             </div>
+          </div>
+      </div>
+
     </div>
   );
 };
