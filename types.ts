@@ -19,6 +19,13 @@ export interface UnitOfMeasure {
   name: string;
 }
 
+// Service Catalog Interface (New - Master Data)
+export interface ServiceCatalogItem {
+  id: string;
+  name: string;
+  category?: string;
+}
+
 // User Interface
 export interface User {
   id: string;
@@ -44,11 +51,13 @@ export interface Contractor {
 
 export interface PriceListEntry {
   id: string;
-  serviceName: string;
+  serviceName: string; // Now normalized via Catalog
   company: string; 
   contractorId?: string;
+  clientId?: string; // Specific client pricing
   unitOfMeasure: string; 
   unitPrice: number;
+  contractorCost?: number; 
   validFrom: string; 
   validTo: string; 
 }
@@ -61,13 +70,15 @@ export interface Order {
   clientName: string; 
   poNumber: string; 
   serviceName: string;
+  serviceDetails?: string; // NEW: Optional additional ID or Detail
   unitOfMeasure: string; 
   quantity: number;
   unitPrice: number;
+  unitCost?: number; 
   totalValue: number;
   contractorId?: string; 
   contractorName?: string; 
-  status: string; // Now a dynamic string
+  status: string; 
   operationsRep: string; 
   observations: string;
   

@@ -24,15 +24,17 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
   // Available services based on selected company/contractor
   const [availableServices, setAvailableServices] = useState<PriceListEntry[]>([]);
 
-  const [formData, setFormData] = useState<OrderFormData & { commitmentDate: string; clientCertDate: string; billingDate: string }>({
+  const [formData, setFormData] = useState<OrderFormData & { commitmentDate: string; clientCertDate: string; billingDate: string, unitCost?: number }>({
     date: new Date().toISOString().split('T')[0],
     company: '',
     clientId: '',
     poNumber: '',
     serviceName: '',
+    serviceDetails: '', // NEW Field
     unitOfMeasure: 'Horas',
     quantity: 1,
     unitPrice: 0,
+    unitCost: 0,
     contractorId: '',
     status: '', // Set on load
     operationsRep: '',
@@ -74,13 +76,17 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
       }
   }, [workflow, initialData, formData.status, units]);
 
-  // Filter Price List when Company or Contractor changes
+  // Filter Price List when Company, Client or Contractor changes
   useEffect(() => {
     const filtered = priceList.filter(p => {
         // Filter by company name matching
         if (p.company !== formData.company) return false;
+        
         // Filter by contractor (if specific price exists for that contractor)
         if (p.contractorId && formData.contractorId && p.contractorId !== formData.contractorId) return false;
+        
+        // Filter by Client (New Logic)
+        if (p.clientId && formData.clientId && p.clientId !== formData.clientId) return false;
         
         // Date Check
         const orderDate = formData.date;
@@ -89,7 +95,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
         return true;
     });
     setAvailableServices(filtered);
-  }, [formData.company, formData.contractorId, formData.date, priceList]);
+  }, [formData.company, formData.contractorId, formData.clientId, formData.date, priceList]);
 
   // Load initial data
   useEffect(() => {
@@ -97,6 +103,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
       const { id, totalValue, clientName, contractorName, ...rest } = initialData;
       setFormData({
           ...rest,
+          unitCost: initialData.unitCost || 0, // Ensure cost is loaded
           commitmentDate: initialData.commitmentDate || '',
           clientCertDate: initialData.clientCertDate || '',
           billingDate: initialData.billingDate || ''
@@ -109,9 +116,11 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
             clientId: '',
             poNumber: '',
             serviceName: '',
+            serviceDetails: '',
             unitOfMeasure: units.length > 0 ? units[0].name : 'Horas',
             quantity: 1,
             unitPrice: 0,
+            unitCost: 0,
             contractorId: '',
             status: workflow.length > 0 ? workflow[0].name : '',
             operationsRep: '',
@@ -144,6 +153,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
       const match = availableServices.find(s => s.serviceName === val);
       if (match) {
           update.unitPrice = match.unitPrice;
+          update.unitCost = match.contractorCost || 0; // Capture cost automatically
           update.unitOfMeasure = match.unitOfMeasure;
           // Optionally auto-select contractor if locked in price list
           if(match.contractorId) update.contractorId = match.contractorId;
@@ -189,6 +199,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
 
     const orderToSave: Order = {
       ...formData,
+      unitCost: formData.unitCost || 0, // Ensure it's saved
       id: initialData?.id || Math.random().toString(36).substr(2, 9),
       clientName: clientObj ? clientObj.name : 'Cliente Desconocido',
       contractorName: contractorObj ? contractorObj.name : 'No Asignado',
@@ -296,7 +307,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
               <input type="text" name="poNumber" value={formData.poNumber} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: OC-12345" />
             </div>
 
-            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+            <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Servicio (Sugerido por lista de precios)</label>
               <input 
                 list="services-list" 
@@ -312,6 +323,18 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
                       <option key={s.id} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure} (${getContractors().find(c => c.id === s.contractorId)?.name || 'Genérico'})`}</option>
                   ))}
               </datalist>
+            </div>
+
+            <div className="col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Detalle / ID Adicional</label>
+                <input 
+                    type="text" 
+                    name="serviceDetails" 
+                    value={formData.serviceDetails || ''} 
+                    onChange={handleChange} 
+                    className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Ej: Ticket #100, ID Proyecto..." 
+                />
             </div>
 
             {/* Section 3: Economics */}

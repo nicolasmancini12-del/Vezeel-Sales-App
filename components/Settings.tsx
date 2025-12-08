@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure } from '../types';
+import { Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem } from '../types';
 import { 
     getClients, saveClient, deleteClient, 
     getContractors, saveContractor, deleteContractor, 
@@ -9,17 +9,18 @@ import {
     getUsers, saveUser, deleteUser,
     getWorkflow, saveWorkflowStatus, deleteWorkflowStatus,
     getUnits, saveUnit, deleteUnit,
+    getServices, saveService, deleteService,
     exportBackup, importBackup
 } from '../services/storageService';
 import { COLOR_OPTIONS, ROLES } from '../constants';
-import { Plus, Trash2, Edit2, Save, X, Lock, Download, Upload, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Lock, Download, Upload, AlertTriangle, Book } from 'lucide-react';
 
 interface Props {
   currentUser?: User | null;
 }
 
 const Settings: React.FC<Props> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'companies' | 'clients' | 'contractors' | 'prices' | 'users' | 'workflow' | 'units' | 'backup'>('companies');
+  const [activeTab, setActiveTab] = useState<'companies' | 'clients' | 'contractors' | 'prices' | 'users' | 'workflow' | 'units' | 'services' | 'backup'>('companies');
 
   const isReadOnly = currentUser?.role === ROLES.VIEWER;
 
@@ -28,9 +29,10 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
       { id: 'workflow', label: 'Flujo / Estados' },
       { id: 'users', label: 'Usuarios' },
       { id: 'units', label: 'Unidades' },
+      { id: 'services', label: 'Catálogo Servicios' },
       { id: 'clients', label: 'Clientes' },
       { id: 'contractors', label: 'Contratistas' },
-      { id: 'prices', label: 'Precios' },
+      { id: 'prices', label: 'Precios y Costos' },
       { id: 'backup', label: 'Respaldo' }
   ];
 
@@ -67,6 +69,7 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
         {activeTab === 'prices' && <PriceListManager readOnly={isReadOnly} />}
         {activeTab === 'workflow' && <WorkflowManager readOnly={isReadOnly} />}
         {activeTab === 'units' && <UnitsManager readOnly={isReadOnly} />}
+        {activeTab === 'services' && <ServiceCatalogManager readOnly={isReadOnly} />}
         {activeTab === 'backup' && <BackupManager />}
       </div>
     </div>
@@ -220,6 +223,96 @@ const UnitsManager = ({ readOnly }: { readOnly: boolean }) => {
                             <td className="px-4 py-3 text-right">
                                 <button onClick={() => setEditing(u)} className="text-blue-600 hover:text-blue-900 mr-2 p-1"><Edit2 size={16}/></button>
                                 <button onClick={() => setUnits(deleteUnit(u.id))} className="text-red-600 hover:text-red-900 p-1"><Trash2 size={16}/></button>
+                            </td>
+                        )}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+      </div>
+    );
+};
+
+const ServiceCatalogManager = ({ readOnly }: { readOnly: boolean }) => {
+    const [services, setServices] = useState<ServiceCatalogItem[]>([]);
+    const [editing, setEditing] = useState<Partial<ServiceCatalogItem> | null>(null);
+  
+    useEffect(() => setServices(getServices()), []);
+  
+    const handleSave = () => {
+      if (!editing?.name) return;
+      const toSave = { 
+          id: editing.id || Math.random().toString(36).substr(2, 9),
+          name: editing.name,
+          category: editing.category || ''
+      } as ServiceCatalogItem;
+      
+      setServices(saveService(toSave));
+      setEditing(null);
+    };
+  
+    return (
+      <div>
+        <div className="flex justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Catálogo Maestro de Servicios</h3>
+            <p className="text-sm text-gray-500">Normalización de nombres de servicios para evitar duplicados.</p>
+          </div>
+          {!readOnly && (
+              <button onClick={() => setEditing({})} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700 h-fit">
+                  <Plus size={16} /> Nuevo Servicio
+              </button>
+          )}
+        </div>
+        
+        {editing && (
+            <div className="bg-gray-50 p-4 rounded-lg mb-4 border border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                     <label className="text-xs text-gray-500 font-bold">Nombre Servicio</label>
+                     <input 
+                        placeholder="Ej: Desarrollo Java Senior" 
+                        className="border p-2 rounded w-full text-sm"
+                        value={editing.name || ''} 
+                        onChange={e => setEditing({...editing, name: e.target.value})} 
+                    />
+                </div>
+                <div>
+                    <label className="text-xs text-gray-500 font-bold">Categoría (Opcional)</label>
+                    <input 
+                        placeholder="Ej: Desarrollo, Consultoría" 
+                        className="border p-2 rounded w-full text-sm"
+                        value={editing.category || ''} 
+                        onChange={e => setEditing({...editing, category: e.target.value})} 
+                    />
+                </div>
+                
+                <div className="flex gap-2 justify-end md:col-span-2">
+                  <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-1"><Save size={16}/> Guardar</button>
+                  <button onClick={() => setEditing(null)} className="bg-gray-400 text-white px-4 py-2 rounded text-sm flex items-center gap-1"><X size={16}/> Cancelar</button>
+                </div>
+            </div>
+        )}
+  
+        <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+                <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre Servicio</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                    {!readOnly && <th className="px-4 py-2 text-right">Acciones</th>}
+                </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+                {services.map(s => (
+                    <tr key={s.id}>
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium flex items-center gap-2">
+                            <Book size={14} className="text-blue-400"/>
+                            {s.name}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{s.category || '-'}</td>
+                        {!readOnly && (
+                            <td className="px-4 py-3 text-right">
+                                <button onClick={() => setEditing(s)} className="text-blue-600 hover:text-blue-900 mr-2 p-1"><Edit2 size={16}/></button>
+                                <button onClick={() => setServices(deleteService(s.id))} className="text-red-600 hover:text-red-900 p-1"><Trash2 size={16}/></button>
                             </td>
                         )}
                     </tr>
@@ -693,13 +786,17 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
     const [editing, setEditing] = useState<Partial<PriceListEntry> | null>(null);
     const [contractors, setContractors] = useState<Contractor[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [units, setUnits] = useState<UnitOfMeasure[]>([]);
+    const [services, setServices] = useState<ServiceCatalogItem[]>([]);
 
     useEffect(() => {
         setPrices(getPriceList());
         setContractors(getContractors());
         setCompanies(getCompanies());
+        setClients(getClients());
         setUnits(getUnits());
+        setServices(getServices());
     }, []);
   
     const handleSave = () => {
@@ -709,8 +806,10 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
           serviceName: editing.serviceName,
           company: editing.company,
           contractorId: editing.contractorId,
+          clientId: editing.clientId, // Save client relationship
           unitOfMeasure: editing.unitOfMeasure || (units.length > 0 ? units[0].name : 'Horas'),
           unitPrice: Number(editing.unitPrice),
+          contractorCost: Number(editing.contractorCost || 0),
           validFrom: editing.validFrom || new Date().toISOString().split('T')[0],
           validTo: editing.validTo || '2099-12-31'
       } as PriceListEntry;
@@ -723,12 +822,18 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
         if(!id) return 'Cualquiera';
         return contractors.find(c => c.id === id)?.name || 'Desconocido';
     }
+
+    const getClientName = (id?: string) => {
+        if(!id) return 'Todos / Genérico';
+        return clients.find(c => c.id === id)?.name || 'Desconocido';
+    }
   
     return (
       <div>
         <div className="flex justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-gray-800">Catálogo de Servicios y Precios</h3>
+            <p className="text-sm text-gray-500">Gestión de tarifas normalizadas.</p>
           </div>
           {!readOnly && (
               <button onClick={() => setEditing({})} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700 h-fit">
@@ -753,6 +858,17 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                         </select>
                     </div>
                     <div>
+                        <label className="text-xs text-gray-500 font-bold">Cliente Específico</label>
+                        <select 
+                            className="border p-2 rounded w-full text-sm bg-white"
+                            value={editing.clientId} 
+                            onChange={e => setEditing({...editing, clientId: e.target.value})}
+                        >
+                            <option value="">Todos / Genérico</option>
+                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
                         <label className="text-xs text-gray-500 font-bold">Contratista Asociado</label>
                         <select 
                             className="border p-2 rounded w-full text-sm bg-white"
@@ -764,12 +880,19 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                         </select>
                     </div>
                     <div>
-                        <label className="text-xs text-gray-500 font-bold">Nombre Servicio *</label>
-                        <input 
-                            className="border p-2 rounded w-full text-sm"
+                        <label className="text-xs text-gray-500 font-bold">Nombre Servicio (Catálogo) *</label>
+                        <select
+                            className="border p-2 rounded w-full text-sm bg-white"
                             value={editing.serviceName || ''} 
                             onChange={e => setEditing({...editing, serviceName: e.target.value})} 
-                        />
+                        >
+                            <option value="">Seleccionar Servicio...</option>
+                            {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                            {/* If editing an old service not in catalog, allow it */}
+                            {editing.serviceName && !services.find(s => s.name === editing.serviceName) && (
+                                <option value={editing.serviceName}>{editing.serviceName} (No en catálogo)</option>
+                            )}
+                        </select>
                     </div>
                     
                     <div>
@@ -783,7 +906,7 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                         </select>
                     </div>
                     <div>
-                        <label className="text-xs text-gray-500">Precio Unitario</label>
+                        <label className="text-xs text-gray-500">Precio Unitario (Venta)</label>
                         <div className="relative">
                             <span className="absolute left-2 top-2 text-gray-400">$</span>
                             <input 
@@ -791,6 +914,18 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                                 className="border p-2 pl-6 rounded w-full text-sm"
                                 value={editing.unitPrice || ''} 
                                 onChange={e => setEditing({...editing, unitPrice: Number(e.target.value)})} 
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 font-bold text-amber-700">Costo Contratista</label>
+                        <div className="relative">
+                            <span className="absolute left-2 top-2 text-gray-400">$</span>
+                            <input 
+                                type="number"
+                                className="border p-2 pl-6 rounded w-full text-sm border-amber-200 focus:ring-amber-500"
+                                value={editing.contractorCost || ''} 
+                                onChange={e => setEditing({...editing, contractorCost: Number(e.target.value)})} 
                             />
                         </div>
                     </div>
@@ -817,24 +952,36 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                 <thead className="bg-gray-50">
                     <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Empresa Vendedora</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contratista</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cliente / Contratista</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Servicio</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio / Costo</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Margen</th>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vigencia</th>
                         {!readOnly && <th className="px-4 py-2"></th>}
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                    {prices.map(p => (
+                    {prices.map(p => {
+                        const margin = p.unitPrice > 0 ? ((p.unitPrice - (p.contractorCost || 0)) / p.unitPrice) * 100 : 0;
+                        const isLowMargin = margin < 20;
+
+                        return (
                         <tr key={p.id} className="hover:bg-gray-50">
                              <td className="px-4 py-3 text-sm text-gray-900 font-medium">{p.company}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                                {getContractorName(p.contractorId)}
+                             <td className="px-4 py-3 text-sm text-gray-500">
+                                <div><span className="font-bold text-xs text-gray-400">CL:</span> {getClientName(p.clientId)}</div>
+                                <div><span className="font-bold text-xs text-gray-400">CT:</span> {getContractorName(p.contractorId)}</div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-900">{p.serviceName}</td>
                            
-                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold">
-                                ${p.unitPrice} <span className="text-gray-500 text-xs font-normal">/ {p.unitOfMeasure}</span>
+                            <td className="px-4 py-3 text-sm">
+                                <div className="font-semibold text-gray-900">${p.unitPrice} <span className="text-gray-400 text-xs">/ {p.unitOfMeasure}</span></div>
+                                <div className="text-xs text-amber-700">Costo: ${p.contractorCost || 0}</div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${isLowMargin ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                    {margin.toFixed(1)}%
+                                </span>
                             </td>
                             <td className="px-4 py-3 text-xs text-gray-500">
                                 {p.validFrom} <span className="mx-1">➔</span> {p.validTo}
@@ -846,7 +993,7 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                                 </td>
                             )}
                         </tr>
-                    ))}
+                    )})}
                 </tbody>
             </table>
         </div>

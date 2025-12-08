@@ -1,6 +1,6 @@
 
-import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure } from '../types';
-import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE } from '../constants';
+import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem } from '../types';
+import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE, MOCK_SERVICES } from '../constants';
 
 const KEYS = {
   ORDERS: 'nexus_orders_v2',
@@ -10,7 +10,8 @@ const KEYS = {
   COMPANIES: 'nexus_companies_v1',
   USERS: 'nexus_users_v1',
   WORKFLOW: 'nexus_workflow_v1',
-  UNITS: 'nexus_units_v1'
+  UNITS: 'nexus_units_v1',
+  SERVICES: 'nexus_services_catalog_v1'
 };
 
 // Helper for generic CRUD
@@ -83,7 +84,7 @@ export const saveWorkflowStatus = (w: WorkflowStatus) => {
 }
 export const deleteWorkflowStatus = (id: string) => deleteItem<WorkflowStatus>(KEYS.WORKFLOW, id);
 
-// --- Units of Measure (New) ---
+// --- Units of Measure ---
 export const getUnits = () => {
     const stored = localStorage.getItem(KEYS.UNITS);
     if (!stored) {
@@ -100,6 +101,12 @@ export const getUnits = () => {
 export const saveUnit = (u: UnitOfMeasure) => saveItem(KEYS.UNITS, u);
 export const deleteUnit = (id: string) => deleteItem<UnitOfMeasure>(KEYS.UNITS, id);
 
+// --- Service Catalog (New) ---
+export const getServices = () => getList<ServiceCatalogItem>(KEYS.SERVICES, MOCK_SERVICES);
+export const saveService = (s: ServiceCatalogItem) => saveItem(KEYS.SERVICES, s);
+export const deleteService = (id: string) => deleteItem<ServiceCatalogItem>(KEYS.SERVICES, id);
+
+
 // --- BACKUP SYSTEM ---
 
 export const exportBackup = () => {
@@ -112,8 +119,9 @@ export const exportBackup = () => {
         users: getUsers(),
         workflow: getWorkflow(),
         units: getUnits(),
+        services: getServices(),
         timestamp: new Date().toISOString(),
-        version: '1.0'
+        version: '1.2'
     };
     return JSON.stringify(backupData, null, 2);
 };
@@ -137,6 +145,7 @@ export const importBackup = (jsonString: string): boolean => {
         localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
         localStorage.setItem(KEYS.WORKFLOW, JSON.stringify(data.workflow));
         if (data.units) localStorage.setItem(KEYS.UNITS, JSON.stringify(data.units));
+        if (data.services) localStorage.setItem(KEYS.SERVICES, JSON.stringify(data.services));
 
         return true;
     } catch (e) {

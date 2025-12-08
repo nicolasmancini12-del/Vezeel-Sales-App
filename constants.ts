@@ -1,5 +1,5 @@
 
-import { Company, Client, Contractor, PriceListEntry, User, WorkflowStatus } from './types';
+import { Company, Client, Contractor, PriceListEntry, User, WorkflowStatus, ServiceCatalogItem } from './types';
 
 export const ROLES = {
   ADMIN: 'Admin',
@@ -31,6 +31,15 @@ export const DEFAULT_WORKFLOW: WorkflowStatus[] = [
 
 // Unit of Measures common list
 export const UNITS_OF_MEASURE = ['Horas', 'Mza', 'HP', 'Días', 'Proyecto', 'Story Points', 'Licencia'];
+
+// Mock Data - Services Catalog (New)
+export const MOCK_SERVICES: ServiceCatalogItem[] = [
+    { id: 's1', name: 'Desarrollo Senior Java', category: 'Desarrollo' },
+    { id: 's2', name: 'Consultoría SAP MM', category: 'Consultoría' },
+    { id: 's3', name: 'Mantenimiento Mensual App', category: 'Soporte' },
+    { id: 's4', name: 'Diseño UX/UI', category: 'Diseño' },
+    { id: 's5', name: 'DevOps Cloud AWS', category: 'Infraestructura' }
+];
 
 // Mock Data - Users
 export const MOCK_USERS: User[] = [
@@ -68,8 +77,10 @@ export const MOCK_PRICE_LIST: PriceListEntry[] = [
     serviceName: 'Desarrollo Senior Java', 
     company: 'Tech Solutions S.A.', 
     contractorId: 'ct1', 
+    clientId: '', // Generic for all clients
     unitOfMeasure: 'Horas', 
     unitPrice: 85, 
+    contractorCost: 50,
     validFrom: '2023-01-01', 
     validTo: '2025-12-31' 
   },
@@ -78,8 +89,10 @@ export const MOCK_PRICE_LIST: PriceListEntry[] = [
     serviceName: 'Consultoría SAP MM', 
     company: 'Global Services Ltd', 
     contractorId: 'ct2', 
+    clientId: 'c3', // Specific for Logistica Express
     unitOfMeasure: 'Días', 
     unitPrice: 600, 
+    contractorCost: 400,
     validFrom: '2023-01-01', 
     validTo: '2024-12-31' 
   },
@@ -88,8 +101,10 @@ export const MOCK_PRICE_LIST: PriceListEntry[] = [
     serviceName: 'Mantenimiento Mensual App', 
     company: 'Innovate Corp', 
     contractorId: 'ct4', 
+    clientId: 'c2', 
     unitOfMeasure: 'Mza', 
     unitPrice: 1500, 
+    contractorCost: 0, // Internal
     validFrom: '2023-06-01', 
     validTo: '2024-06-01' 
   }
@@ -104,10 +119,12 @@ export const MOCK_ORDERS = [
     clientId: 'c1',
     clientName: 'Banco Futuro',
     poNumber: 'OC-9982',
-    serviceName: 'Migración Core Bancario - Fase 1',
+    serviceName: 'Desarrollo Senior Java', // Matched to catalog
+    serviceDetails: 'Ticket #JIRA-442 Sprint 12',
     unitOfMeasure: 'Horas',
     quantity: 120,
     unitPrice: 85,
+    unitCost: 50,
     totalValue: 10200,
     contractorId: 'ct1',
     contractorName: 'DevSquad External',
@@ -123,10 +140,12 @@ export const MOCK_ORDERS = [
     clientId: 'c2',
     clientName: 'Retail Giants',
     poNumber: 'OC-2211',
-    serviceName: 'App Mobile Loyalty',
+    serviceName: 'Mantenimiento Mensual App',
+    serviceDetails: '',
     unitOfMeasure: 'Proyecto',
     quantity: 1,
     unitPrice: 15000,
+    unitCost: 8000,
     totalValue: 15000,
     contractorId: 'ct4',
     contractorName: 'Interno',

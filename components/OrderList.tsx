@@ -2,9 +2,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Order, Company, User, WorkflowStatus } from '../types';
 import StatusBadge from './StatusBadge';
-import { Edit2, Trash2, Search } from 'lucide-react';
+import { Edit2, Trash2, Search, Download } from 'lucide-react';
 import { getCompanies, getWorkflow } from '../services/storageService';
 import { ROLES } from '../constants';
+import * as XLSX from 'xlsx';
 
 interface Props {
   orders: Order[];
@@ -32,6 +33,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
       const matchesSearch = 
         (order.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.serviceName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.serviceDetails || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.poNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.id.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -42,12 +44,46 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
     });
   }, [orders, searchTerm, companyFilter, statusFilter]);
 
+  const handleExportExcel = () => {
+    const dataToExport = filteredOrders.map(o => ({
+      ID: o.id,
+      FechaRegistro: o.date,
+      EmpresaVendedora: o.company,
+      Cliente: o.clientName,
+      OC: o.poNumber,
+      Servicio: o.serviceName,
+      DetalleID_Servicio: o.serviceDetails || '',
+      Cantidad: o.quantity,
+      Unidad: o.unitOfMeasure,
+      PrecioUnitario: o.unitPrice,
+      CostoUnitario: o.unitCost || 0,
+      TotalVenta: o.totalValue,
+      Contratista: o.contractorName,
+      Estado: o.status,
+      Responsable: o.operationsRep,
+      FechaCompromiso: o.commitmentDate,
+      FechaCertificacion: o.clientCertDate,
+      FechaFacturacion: o.billingDate,
+      Observaciones: o.observations
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+    
+    // Auto-width columns
+    const wscols = Object.keys(dataToExport[0] || {}).map(() => ({ wch: 15 }));
+    ws['!cols'] = wscols;
+
+    XLSX.writeFile(wb, `NexusOrders_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Filters Toolbar */}
       <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row gap-4 items-center justify-between bg-white">
         
-        <div className="relative w-full md:w-96">
+        <div className="relative w-full md:w-80">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
           </div>
@@ -60,7 +96,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
           />
         </div>
 
-        <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 items-center">
           <div className="relative inline-block text-left min-w-[150px]">
              <select 
                value={companyFilter} 
@@ -82,6 +118,15 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                {workflow.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
              </select>
           </div>
+
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors shadow-sm ml-2"
+            title="Descargar Excel"
+          >
+              <Download size={16} />
+              <span className="hidden md:inline">Excel</span>
+          </button>
         </div>
       </div>
 
@@ -115,6 +160,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                 <td className="px-6 py-4">
                   <div className="text-sm font-semibold text-gray-900">{order.clientName}</div>
                   <div className="text-sm text-gray-600 truncate max-w-xs" title={order.serviceName}>{order.serviceName}</div>
+                  {order.serviceDetails && <div className="text-xs text-indigo-600 font-medium mt-0.5">{order.serviceDetails}</div>}
                   {order.poNumber && <div className="text-xs text-gray-500 mt-0.5">OC: {order.poNumber}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
