@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus } from '../types';
-import { UNITS_OF_MEASURE } from '../constants';
+import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure } from '../types';
 import { X, Sparkles, Loader2, Calendar } from 'lucide-react';
 import { analyzeTextForOrder } from '../services/geminiService';
-import { getClients, getContractors, getPriceList, getCompanies, getWorkflow } from '../services/storageService';
+import { getClients, getContractors, getPriceList, getCompanies, getWorkflow, getUnits } from '../services/storageService';
 
 interface Props {
   isOpen: boolean;
@@ -20,6 +19,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [priceList, setPriceList] = useState<PriceListEntry[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowStatus[]>([]);
+  const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   
   // Available services based on selected company/contractor
   const [availableServices, setAvailableServices] = useState<PriceListEntry[]>([]);
@@ -52,6 +52,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
         setContractors(getContractors());
         setPriceList(getPriceList());
         setWorkflow(getWorkflow());
+        setUnits(getUnits());
         
         // Load companies and set default if form is empty
         const comps = getCompanies();
@@ -62,12 +63,16 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
     }
   }, [isOpen]);
 
-  // Set default status if new
+  // Set default status and default unit if new
   useEffect(() => {
       if (!initialData && !formData.status && workflow.length > 0) {
-          setFormData(prev => ({ ...prev, status: workflow[0].name }));
+          setFormData(prev => ({ 
+              ...prev, 
+              status: workflow[0].name,
+              unitOfMeasure: units.length > 0 ? units[0].name : 'Horas' 
+            }));
       }
-  }, [workflow, initialData, formData.status]);
+  }, [workflow, initialData, formData.status, units]);
 
   // Filter Price List when Company or Contractor changes
   useEffect(() => {
@@ -104,7 +109,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
             clientId: '',
             poNumber: '',
             serviceName: '',
-            unitOfMeasure: 'Horas',
+            unitOfMeasure: units.length > 0 ? units[0].name : 'Horas',
             quantity: 1,
             unitPrice: 0,
             contractorId: '',
@@ -116,7 +121,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
             billingDate: ''
         }));
     }
-  }, [initialData, isOpen, workflow]);
+  }, [initialData, isOpen, workflow, units]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -317,7 +322,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) 
             <div className="col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unidad Medida</label>
                 <select name="unitOfMeasure" required value={formData.unitOfMeasure} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                    {UNITS_OF_MEASURE.map(u => <option key={u} value={u}>{u}</option>)}
+                    {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                 </select>
             </div>
 

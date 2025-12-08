@@ -13,6 +13,12 @@ export interface Company {
   name: string;
 }
 
+// Unit of Measure Interface (New)
+export interface UnitOfMeasure {
+  id: string;
+  name: string;
+}
+
 // User Interface
 export interface User {
   id: string;

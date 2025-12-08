@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, Contractor, PriceListEntry, Company, User, WorkflowStatus } from '../types';
+import { Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure } from '../types';
 import { 
     getClients, saveClient, deleteClient, 
     getContractors, saveContractor, deleteContractor, 
     getPriceList, savePriceListEntry, deletePriceListEntry,
     getCompanies, saveCompany, deleteCompany,
     getUsers, saveUser, deleteUser,
-    getWorkflow, saveWorkflowStatus, deleteWorkflowStatus
+    getWorkflow, saveWorkflowStatus, deleteWorkflowStatus,
+    getUnits, saveUnit, deleteUnit
 } from '../services/storageService';
-import { UNITS_OF_MEASURE, COLOR_OPTIONS, ROLES } from '../constants';
+import { COLOR_OPTIONS, ROLES } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Lock } from 'lucide-react';
 
 interface Props {
@@ -17,7 +18,7 @@ interface Props {
 }
 
 const Settings: React.FC<Props> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'companies' | 'clients' | 'contractors' | 'prices' | 'users' | 'workflow'>('companies');
+  const [activeTab, setActiveTab] = useState<'companies' | 'clients' | 'contractors' | 'prices' | 'users' | 'workflow' | 'units'>('companies');
 
   const isReadOnly = currentUser?.role === ROLES.VIEWER;
 
@@ -25,6 +26,7 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
       { id: 'companies', label: 'Empresas' },
       { id: 'workflow', label: 'Flujo / Estados' },
       { id: 'users', label: 'Usuarios' },
+      { id: 'units', label: 'Unidades' },
       { id: 'clients', label: 'Clientes' },
       { id: 'contractors', label: 'Contratistas' },
       { id: 'prices', label: 'Precios' }
@@ -62,12 +64,84 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
         {activeTab === 'contractors' && <ContractorsManager readOnly={isReadOnly} />}
         {activeTab === 'prices' && <PriceListManager readOnly={isReadOnly} />}
         {activeTab === 'workflow' && <WorkflowManager readOnly={isReadOnly} />}
+        {activeTab === 'units' && <UnitsManager readOnly={isReadOnly} />}
       </div>
     </div>
   );
 };
 
 // --- Sub-components ---
+
+const UnitsManager = ({ readOnly }: { readOnly: boolean }) => {
+    const [units, setUnits] = useState<UnitOfMeasure[]>([]);
+    const [editing, setEditing] = useState<Partial<UnitOfMeasure> | null>(null);
+  
+    useEffect(() => setUnits(getUnits()), []);
+  
+    const handleSave = () => {
+      if (!editing?.name) return;
+      const toSave = { 
+          id: editing.id || Math.random().toString(36).substr(2, 9),
+          name: editing.name
+      } as UnitOfMeasure;
+      
+      setUnits(saveUnit(toSave));
+      setEditing(null);
+    };
+  
+    return (
+      <div>
+        <div className="flex justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Unidades de Medida</h3>
+            <p className="text-sm text-gray-500">Defina las unidades disponibles para servicios (Horas, Mza, etc).</p>
+          </div>
+          {!readOnly && (
+              <button onClick={() => setEditing({})} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700 h-fit">
+                  <Plus size={16} /> Nueva Unidad
+              </button>
+          )}
+        </div>
+        
+        {editing && (
+            <div className="bg-gray-50 p-4 rounded-lg mb-4 border border-blue-100 grid grid-cols-2 gap-4">
+                <input 
+                  placeholder="Nombre (ej: Horas, Días)" 
+                  className="border p-2 rounded w-full"
+                  value={editing.name || ''} 
+                  onChange={e => setEditing({...editing, name: e.target.value})} 
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-1"><Save size={16}/> Guardar</button>
+                  <button onClick={() => setEditing(null)} className="bg-gray-400 text-white px-4 py-2 rounded text-sm flex items-center gap-1"><X size={16}/> Cancelar</button>
+                </div>
+            </div>
+        )}
+  
+        <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+                <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre Unidad</th>
+                    {!readOnly && <th className="px-4 py-2 text-right">Acciones</th>}
+                </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+                {units.map(u => (
+                    <tr key={u.id}>
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">{u.name}</td>
+                        {!readOnly && (
+                            <td className="px-4 py-3 text-right">
+                                <button onClick={() => setEditing(u)} className="text-blue-600 hover:text-blue-900 mr-2 p-1"><Edit2 size={16}/></button>
+                                <button onClick={() => setUnits(deleteUnit(u.id))} className="text-red-600 hover:text-red-900 p-1"><Trash2 size={16}/></button>
+                            </td>
+                        )}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+      </div>
+    );
+};
 
 const WorkflowManager = ({ readOnly }: { readOnly: boolean }) => {
     const [workflow, setWorkflow] = useState<WorkflowStatus[]>([]);
@@ -532,11 +606,13 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
     const [editing, setEditing] = useState<Partial<PriceListEntry> | null>(null);
     const [contractors, setContractors] = useState<Contractor[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
+    const [units, setUnits] = useState<UnitOfMeasure[]>([]);
 
     useEffect(() => {
         setPrices(getPriceList());
         setContractors(getContractors());
         setCompanies(getCompanies());
+        setUnits(getUnits());
     }, []);
   
     const handleSave = () => {
@@ -546,7 +622,7 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
           serviceName: editing.serviceName,
           company: editing.company,
           contractorId: editing.contractorId,
-          unitOfMeasure: editing.unitOfMeasure || 'Horas',
+          unitOfMeasure: editing.unitOfMeasure || (units.length > 0 ? units[0].name : 'Horas'),
           unitPrice: Number(editing.unitPrice),
           validFrom: editing.validFrom || new Date().toISOString().split('T')[0],
           validTo: editing.validTo || '2099-12-31'
@@ -616,7 +692,7 @@ const ContractorsManager = ({ readOnly }: { readOnly: boolean }) => {
                             value={editing.unitOfMeasure} 
                             onChange={e => setEditing({...editing, unitOfMeasure: e.target.value})}
                         >
-                             {UNITS_OF_MEASURE.map(u => <option key={u} value={u}>{u}</option>)}
+                             {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                         </select>
                     </div>
                     <div>

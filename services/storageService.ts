@@ -1,6 +1,6 @@
 
-import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus } from '../types';
-import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW } from '../constants';
+import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure } from '../types';
+import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE } from '../constants';
 
 const KEYS = {
   ORDERS: 'nexus_orders_v2',
@@ -9,7 +9,8 @@ const KEYS = {
   PRICES: 'nexus_prices_v1',
   COMPANIES: 'nexus_companies_v1',
   USERS: 'nexus_users_v1',
-  WORKFLOW: 'nexus_workflow_v1'
+  WORKFLOW: 'nexus_workflow_v1',
+  UNITS: 'nexus_units_v1'
 };
 
 // Helper for generic CRUD
@@ -73,12 +74,28 @@ export const getUsers = () => getList<User>(KEYS.USERS, MOCK_USERS);
 export const saveUser = (u: User) => saveItem(KEYS.USERS, u);
 export const deleteUser = (id: string) => deleteItem<User>(KEYS.USERS, id);
 
-// --- Workflow (New) ---
+// --- Workflow ---
 export const getWorkflow = () => getList<WorkflowStatus>(KEYS.WORKFLOW, DEFAULT_WORKFLOW).sort((a,b) => a.order - b.order);
 export const saveWorkflowStatus = (w: WorkflowStatus) => {
     const list = getWorkflow();
-    // If saving, sort by order automatically might be nice, but we just save for now
     const saved = saveItem(KEYS.WORKFLOW, w);
     return saved.sort((a,b) => a.order - b.order);
 }
 export const deleteWorkflowStatus = (id: string) => deleteItem<WorkflowStatus>(KEYS.WORKFLOW, id);
+
+// --- Units of Measure (New) ---
+export const getUnits = () => {
+    const stored = localStorage.getItem(KEYS.UNITS);
+    if (!stored) {
+        // Seed from constant list for first time
+        const seedData: UnitOfMeasure[] = UNITS_OF_MEASURE.map(u => ({
+            id: Math.random().toString(36).substr(2, 9),
+            name: u
+        }));
+        localStorage.setItem(KEYS.UNITS, JSON.stringify(seedData));
+        return seedData;
+    }
+    return JSON.parse(stored) as UnitOfMeasure[];
+};
+export const saveUnit = (u: UnitOfMeasure) => saveItem(KEYS.UNITS, u);
+export const deleteUnit = (id: string) => deleteItem<UnitOfMeasure>(KEYS.UNITS, id);
