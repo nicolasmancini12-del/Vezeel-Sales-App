@@ -99,3 +99,48 @@ export const getUnits = () => {
 };
 export const saveUnit = (u: UnitOfMeasure) => saveItem(KEYS.UNITS, u);
 export const deleteUnit = (id: string) => deleteItem<UnitOfMeasure>(KEYS.UNITS, id);
+
+// --- BACKUP SYSTEM ---
+
+export const exportBackup = () => {
+    const backupData = {
+        orders: getOrders(),
+        clients: getClients(),
+        contractors: getContractors(),
+        companies: getCompanies(),
+        prices: getPriceList(),
+        users: getUsers(),
+        workflow: getWorkflow(),
+        units: getUnits(),
+        timestamp: new Date().toISOString(),
+        version: '1.0'
+    };
+    return JSON.stringify(backupData, null, 2);
+};
+
+export const importBackup = (jsonString: string): boolean => {
+    try {
+        const data = JSON.parse(jsonString);
+        
+        // Validate basic structure
+        if (!data.orders || !data.clients || !data.companies) {
+            console.error("Invalid backup file format");
+            return false;
+        }
+
+        // Save everything
+        localStorage.setItem(KEYS.ORDERS, JSON.stringify(data.orders));
+        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(data.clients));
+        localStorage.setItem(KEYS.CONTRACTORS, JSON.stringify(data.contractors));
+        localStorage.setItem(KEYS.COMPANIES, JSON.stringify(data.companies));
+        localStorage.setItem(KEYS.PRICES, JSON.stringify(data.prices));
+        localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
+        localStorage.setItem(KEYS.WORKFLOW, JSON.stringify(data.workflow));
+        if (data.units) localStorage.setItem(KEYS.UNITS, JSON.stringify(data.units));
+
+        return true;
+    } catch (e) {
+        console.error("Error importing backup", e);
+        return false;
+    }
+};

@@ -8,17 +8,18 @@ import {
     getCompanies, saveCompany, deleteCompany,
     getUsers, saveUser, deleteUser,
     getWorkflow, saveWorkflowStatus, deleteWorkflowStatus,
-    getUnits, saveUnit, deleteUnit
+    getUnits, saveUnit, deleteUnit,
+    exportBackup, importBackup
 } from '../services/storageService';
 import { COLOR_OPTIONS, ROLES } from '../constants';
-import { Plus, Trash2, Edit2, Save, X, Lock } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Lock, Download, Upload, AlertTriangle } from 'lucide-react';
 
 interface Props {
   currentUser?: User | null;
 }
 
 const Settings: React.FC<Props> = ({ currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'companies' | 'clients' | 'contractors' | 'prices' | 'users' | 'workflow' | 'units'>('companies');
+  const [activeTab, setActiveTab] = useState<'companies' | 'clients' | 'contractors' | 'prices' | 'users' | 'workflow' | 'units' | 'backup'>('companies');
 
   const isReadOnly = currentUser?.role === ROLES.VIEWER;
 
@@ -29,13 +30,14 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
       { id: 'units', label: 'Unidades' },
       { id: 'clients', label: 'Clientes' },
       { id: 'contractors', label: 'Contratistas' },
-      { id: 'prices', label: 'Precios' }
+      { id: 'prices', label: 'Precios' },
+      { id: 'backup', label: 'Respaldo' }
   ];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden min-h-[600px]">
       <div className="border-b border-gray-200">
-        <nav className="flex -mb-px overflow-x-auto">
+        <nav className="flex -mb-px overflow-x-auto custom-scrollbar">
           {tabs.map(tab => (
               <button
                 key={tab.id}
@@ -51,7 +53,7 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
       </div>
 
       <div className="p-6">
-        {isReadOnly && (
+        {isReadOnly && activeTab !== 'backup' && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
                 <Lock size={16} />
                 <span className="text-sm font-medium">Modo Solo Lectura: No tiene permisos para modificar la configuración.</span>
@@ -65,12 +67,97 @@ const Settings: React.FC<Props> = ({ currentUser }) => {
         {activeTab === 'prices' && <PriceListManager readOnly={isReadOnly} />}
         {activeTab === 'workflow' && <WorkflowManager readOnly={isReadOnly} />}
         {activeTab === 'units' && <UnitsManager readOnly={isReadOnly} />}
+        {activeTab === 'backup' && <BackupManager />}
       </div>
     </div>
   );
 };
 
 // --- Sub-components ---
+
+const BackupManager = () => {
+    const handleDownload = () => {
+        const json = exportBackup();
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const date = new Date().toISOString().split('T')[0];
+        link.href = url;
+        link.download = `nexus_backup_${date}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const content = event.target?.result as string;
+            if (confirm("¿Estás seguro de restaurar este respaldo? Se sobrescribirán todos los datos actuales.")) {
+                const success = importBackup(content);
+                if (success) {
+                    alert("Respaldo restaurado con éxito. La página se recargará.");
+                    window.location.reload();
+                } else {
+                    alert("Error al restaurar: Formato de archivo inválido.");
+                }
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    return (
+        <div className="max-w-2xl mx-auto space-y-8 mt-4">
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="bg-blue-600 p-2 rounded-lg">
+                        <Download className="text-white h-6 w-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900">Exportar Datos</h3>
+                        <p className="text-sm text-gray-600">Descarga una copia completa de tu base de datos (pedidos, clientes, configuraciones) a tu dispositivo.</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={handleDownload}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2"
+                >
+                    <Download size={20} />
+                    Descargar Copia de Seguridad
+                </button>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="bg-amber-500 p-2 rounded-lg">
+                        <Upload className="text-white h-6 w-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900">Restaurar Datos</h3>
+                        <p className="text-sm text-gray-600">Sube un archivo .json previamente exportado para recuperar tus datos.</p>
+                    </div>
+                </div>
+                
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-sm mb-4 flex gap-2">
+                    <AlertTriangle className="shrink-0 mt-0.5" size={16} />
+                    <p>Precaución: Al restaurar un respaldo, se borrarán todos los datos actuales que tengas en el navegador y serán reemplazados por los del archivo.</p>
+                </div>
+
+                <label className="block w-full cursor-pointer bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors">
+                    <input type="file" accept=".json" onChange={handleUpload} className="hidden" />
+                    <div className="flex flex-col items-center">
+                        <Upload className="text-gray-400 h-10 w-10 mb-2" />
+                        <span className="text-gray-600 font-medium">Haga clic para seleccionar archivo de respaldo</span>
+                        <span className="text-gray-400 text-xs mt-1">Soporta archivos .json</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+    );
+};
 
 const UnitsManager = ({ readOnly }: { readOnly: boolean }) => {
     const [units, setUnits] = useState<UnitOfMeasure[]>([]);

@@ -74,11 +74,16 @@ function App() {
       
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10 hidden md:flex">
-        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-lg">
-            <Layers className="text-white h-6 w-6" />
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <Layers className="text-white h-6 w-6" />
+            </div>
+            <div>
+                <h1 className="text-xl font-bold tracking-tight">NexusOrder</h1>
+                <p className="text-xs text-slate-500">v1.2.0 (Prod)</p>
+            </div>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">NexusOrder</h1>
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
