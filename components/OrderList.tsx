@@ -48,13 +48,10 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
   }, [orders, searchTerm, companyFilter, statusFilter]);
 
   const handleExportExcel = () => {
-    const dataToExport = filteredOrders.map(o => {
+    // Sheet 1: Orders (General)
+    const ordersData = filteredOrders.map(o => {
         const progress = o.progressLogs?.reduce((acc, l) => acc + l.quantity, 0) || 0;
-        // Generate detailed progress string for Excel
-        const progressDetails = o.progressLogs?.map(l => 
-            `[${l.quantity}u el ${l.date}${l.certificationDate ? ' Cert:'+l.certificationDate : ''}${l.billingDate ? ' Fac:'+l.billingDate : ''}]`
-        ).join('; ') || '';
-
+        
         return {
             ID: o.id,
             FechaRegistro: o.date,
@@ -63,11 +60,10 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
             OC: o.poNumber,
             Servicio: o.serviceName,
             DetalleID_Servicio: o.serviceDetails || '',
-            Cantidad: o.quantity,
+            CantidadTotal: o.quantity,
             Unidad: o.unitOfMeasure,
             Avance_Acumulado: progress,
             Avance_Porcentaje: o.quantity > 0 ? (progress / o.quantity).toFixed(2) : 0,
-            Avance_Detalle: progressDetails, // New Column with specific dates
             PrecioUnitario: o.unitPrice,
             CostoUnitario: o.unitCost || 0,
             TotalVenta: o.totalValue,
@@ -82,11 +78,43 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
         };
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    // Sheet 2: Detailed Progress Logs
+    const progressData: any[] = [];
+    filteredOrders.forEach(o => {
+        if (o.progressLogs && o.progressLogs.length > 0) {
+            o.progressLogs.forEach(log => {
+                progressData.push({
+                    PedidoID: o.id,
+                    Cliente: o.clientName,
+                    Servicio: o.serviceName,
+                    Fecha_Avance: log.date,
+                    Cantidad_Avance: log.quantity,
+                    Unidad: o.unitOfMeasure,
+                    Fecha_Certificacion_Parcial: log.certificationDate || 'Pendiente',
+                    Fecha_Facturacion_Parcial: log.billingDate || 'Pendiente',
+                    Usuario_Reporte: log.user,
+                    Nota: log.notes
+                });
+            });
+        }
+    });
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
-    const wscols = Object.keys(dataToExport[0] || {}).map(() => ({ wch: 20 }));
-    ws['!cols'] = wscols;
+
+    // Add Sheets
+    const wsOrders = XLSX.utils.json_to_sheet(ordersData);
+    XLSX.utils.book_append_sheet(wb, wsOrders, "Pedidos");
+    
+    // Auto-width columns for Orders
+    const wscols = Object.keys(ordersData[0] || {}).map(() => ({ wch: 20 }));
+    wsOrders['!cols'] = wscols;
+
+    if (progressData.length > 0) {
+        const wsProgress = XLSX.utils.json_to_sheet(progressData);
+        XLSX.utils.book_append_sheet(wb, wsProgress, "Detalle_Avances");
+        const wsProgCols = Object.keys(progressData[0] || {}).map(() => ({ wch: 20 }));
+        wsProgress['!cols'] = wsProgCols;
+    }
 
     XLSX.writeFile(wb, `NexusOrders_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };

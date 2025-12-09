@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem } from '../types';
 import { 
@@ -625,7 +626,7 @@ const PriceListManager = ({ readOnly }: { readOnly: boolean }) => {
                         {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
 
-                    <div className="col-span-1 md:col-span-3 pb-2 border-b border-gray-200 font-bold text-xs text-gray-500 uppercase mt-2">Valores</div>
+                    <div className="col-span-1 md:col-span-3 pb-2 border-b border-gray-200 font-bold text-xs text-gray-500 uppercase mt-2">Valores y Vigencia</div>
 
                     <select className="border p-2 rounded" value={editing.unitOfMeasure || ''} onChange={e => setEditing({...editing, unitOfMeasure: e.target.value})}>
                         {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
@@ -633,6 +634,15 @@ const PriceListManager = ({ readOnly }: { readOnly: boolean }) => {
                     
                     <input className="border p-2 rounded" type="number" placeholder="Precio Venta" value={editing.unitPrice || ''} onChange={e => setEditing({...editing, unitPrice: parseFloat(e.target.value)})} />
                     <input className="border p-2 rounded" type="number" placeholder="Costo Contratista" value={editing.contractorCost || ''} onChange={e => setEditing({...editing, contractorCost: parseFloat(e.target.value)})} />
+                    
+                    <div className="flex flex-col">
+                         <label className="text-[10px] text-gray-500">Válido Desde</label>
+                         <input className="border p-2 rounded" type="date" value={editing.validFrom || ''} onChange={e => setEditing({...editing, validFrom: e.target.value})} />
+                    </div>
+                    <div className="flex flex-col">
+                         <label className="text-[10px] text-gray-500">Válido Hasta</label>
+                         <input className="border p-2 rounded" type="date" value={editing.validTo || ''} onChange={e => setEditing({...editing, validTo: e.target.value})} />
+                    </div>
 
                     <div className="col-span-1 md:col-span-3 flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
                          <button onClick={handleSave} disabled={loading} className="bg-green-600 text-white px-6 py-2 rounded flex items-center gap-2 font-medium">{loading && <Loader2 className="animate-spin" size={16}/>} Guardar</button>
@@ -648,6 +658,7 @@ const PriceListManager = ({ readOnly }: { readOnly: boolean }) => {
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Servicio / Empresa</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalles</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio / Costo</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vigencia</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Margen</th>
                       {!readOnly && <th className="px-3 py-2"></th>}
                     </tr>
@@ -673,11 +684,18 @@ const PriceListManager = ({ readOnly }: { readOnly: boolean }) => {
                                     <div className="text-sm font-bold">${item.unitPrice} <span className="text-xs font-normal text-gray-500">/ {item.unitOfMeasure}</span></div>
                                     <div className="text-xs text-gray-500">Costo: ${item.contractorCost || 0}</div>
                                 </td>
+                                <td className="px-3 py-3 text-xs text-gray-500">
+                                    <div>{item.validFrom}</div>
+                                    <div>{item.validTo}</div>
+                                </td>
                                 <td className="px-3 py-3">
                                     <span className={`text-sm font-bold ${marginColor}`}>{margin.toFixed(1)}%</span>
                                 </td>
                                 {!readOnly && <td className="px-3 py-3 text-right">
-                                    <button onClick={async () => { if(confirm('Borrar?')) setData(await deletePriceListEntry(item.id)) }} className="text-red-600 p-1"><Trash2 size={16}/></button>
+                                    <div className="flex justify-end gap-1">
+                                        <button onClick={() => setEditing(item)} className="text-blue-600 p-1 hover:bg-blue-50 rounded"><Edit2 size={16}/></button>
+                                        <button onClick={async () => { if(confirm('Borrar?')) setData(await deletePriceListEntry(item.id)) }} className="text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+                                    </div>
                                 </td>}
                             </tr>
                         );
