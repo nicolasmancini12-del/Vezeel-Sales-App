@@ -207,7 +207,11 @@ export const saveUser = async (item: User) => {
         initials: item.initials,
         access_code: item.accessCode // Map Interface to DB column
     };
-    await supabase.from('users').upsert(dbUser);
+    const { error } = await supabase.from('users').upsert(dbUser);
+    
+    // CRITICAL: Throw error so UI can catch it (RLS errors)
+    if (error) throw error;
+    
     return getUsers();
 };
 export const deleteUser = async (id: string) => {
@@ -269,8 +273,8 @@ export const getPriceList = async (): Promise<PriceListEntry[]> => {
         unitOfMeasure: d.unit_of_measure,
         unitPrice: d.unit_price,
         contractorCost: d.contractor_cost,
-        validFrom: d.valid_from,
-        validTo: d.valid_to
+        valid_from: d.valid_from,
+        valid_to: d.valid_to
     }));
 };
 export const savePriceListEntry = async (entry: PriceListEntry) => {

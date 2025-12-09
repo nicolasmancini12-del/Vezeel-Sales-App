@@ -12,7 +12,7 @@ import {
     exportBackup
 } from '../services/storageService';
 import { COLOR_OPTIONS, ROLES } from '../constants';
-import { Plus, Trash2, Edit2, Save, X, Lock, Download, AlertTriangle, Book, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Lock, Download, AlertTriangle, Book, Loader2, AlertCircle } from 'lucide-react';
 
 interface Props {
   currentUser?: User | null;
@@ -235,32 +235,54 @@ const CompaniesManager = ({ readOnly }: { readOnly: boolean }) => {
 const UsersManager = ({ readOnly }: { readOnly: boolean }) => {
     const [users, setUsers] = useState<User[]>([]);
     const [editing, setEditing] = useState<Partial<User> | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     
     useEffect(() => { (async () => setUsers(await getUsers()))() }, []);
 
     const handleSave = async () => {
-        if (!editing?.name || !editing.role) return;
-        const nameParts = editing.name.split(' ');
-        const initials = (nameParts[0][0] + (nameParts[1] ? nameParts[1][0] : '')).toUpperCase();
-        const toSave = { 
-            id: editing.id || Math.random().toString(36).substr(2, 9),
-            name: editing.name, 
-            role: editing.role, 
-            initials,
-            accessCode: editing.accessCode || '1234'
-        } as User;
-        setUsers(await saveUser(toSave));
-        setEditing(null);
+        if (!editing?.name || !editing.role) {
+            setError("Nombre y Rol son obligatorios");
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const nameParts = editing.name.split(' ');
+            const initials = (nameParts[0][0] + (nameParts[1] ? nameParts[1][0] : '')).toUpperCase();
+            const toSave = { 
+                id: editing.id || Math.random().toString(36).substr(2, 9),
+                name: editing.name, 
+                role: editing.role, 
+                initials,
+                accessCode: editing.accessCode || '1234'
+            } as User;
+            setUsers(await saveUser(toSave));
+            setEditing(null);
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || "Error guardando usuario. Verifique permisos.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div>
             <div className="flex justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-800">Usuarios</h3>
-                {!readOnly && <button onClick={() => setEditing({})} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm"><Plus size={16} /> Nuevo</button>}
+                {!readOnly && <button onClick={() => { setEditing({}); setError(null); }} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm"><Plus size={16} /> Nuevo</button>}
             </div>
+
+            {error && (
+                <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 flex items-center gap-2 text-sm border border-red-200">
+                    <AlertCircle size={16} />
+                    {error}
+                </div>
+            )}
+
             {editing && (
-                <div className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-2 gap-2">
+                <div className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-2 gap-2 border border-blue-100">
                     <input className="border p-2 rounded" value={editing.name || ''} onChange={e => setEditing({...editing, name: e.target.value})} placeholder="Nombre" />
                     <select className="border p-2 rounded" value={editing.role || ''} onChange={e => setEditing({...editing, role: e.target.value})}>
                         <option value="">Rol...</option>
@@ -271,8 +293,11 @@ const UsersManager = ({ readOnly }: { readOnly: boolean }) => {
                         <input className="border p-2 rounded w-full" type="text" value={editing.accessCode || ''} onChange={e => setEditing({...editing, accessCode: e.target.value})} placeholder="Ej: 1234" />
                     </div>
                     <div className="col-span-2 flex justify-end gap-2 mt-2">
-                         <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded">Guardar</button>
-                         <button onClick={() => setEditing(null)} className="bg-gray-400 text-white px-4 py-2 rounded">Cancelar</button>
+                         <button onClick={handleSave} disabled={loading} className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2">
+                             {loading && <Loader2 className="animate-spin" size={14} />}
+                             Guardar
+                         </button>
+                         <button onClick={() => { setEditing(null); setError(null); }} className="bg-gray-400 text-white px-4 py-2 rounded">Cancelar</button>
                     </div>
                 </div>
             )}
@@ -287,7 +312,7 @@ const UsersManager = ({ readOnly }: { readOnly: boolean }) => {
                             </div>
                         </div>
                         {!readOnly && <div className="flex gap-2">
-                            <button onClick={() => setEditing(u)} className="text-blue-600"><Edit2 size={16}/></button>
+                            <button onClick={() => { setEditing(u); setError(null); }} className="text-blue-600"><Edit2 size={16}/></button>
                             <button onClick={async () => { if(confirm('Borrar?')) setUsers(await deleteUser(u.id)) }} className="text-red-600"><Trash2 size={16}/></button>
                         </div>}
                     </div>
