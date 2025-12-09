@@ -84,13 +84,31 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     }
   }, [isOpen]);
 
-  // Filter Price List
+  // Filter Price List Logic - IMPROVED ROBUSTNESS
   useEffect(() => {
     const filtered = priceList.filter(p => {
+        // 1. Company Match (Mandatory)
         if (p.company !== formData.company) return false;
-        if (p.contractorId && formData.contractorId && p.contractorId !== formData.contractorId) return false;
-        if (p.clientId && formData.clientId && p.clientId !== formData.clientId) return false;
-        // Simple date check
+        
+        // 2. Client Match logic:
+        const priceClientId = p.clientId || '';
+        const formClientId = formData.clientId || '';
+        
+        // If price is specific to a client, it MUST match the selected client.
+        if (priceClientId !== '' && priceClientId !== formClientId) return false;
+        // If price is generic (priceClientId === ''), it passes.
+
+        // 3. Contractor Match logic:
+        const priceContractorId = p.contractorId || '';
+        const formContractorId = formData.contractorId || '';
+
+        // If the user HAS selected a contractor
+        if (formContractorId !== '') {
+            // Filter out prices that are for a DIFFERENT contractor
+            // (Keep Generic Prices AND Prices for this Contractor)
+            if (priceContractorId !== '' && priceContractorId !== formContractorId) return false;
+        }
+
         return true;
     });
     setAvailableServices(filtered);
@@ -147,11 +165,14 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   const handleServiceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       let update = { serviceName: val } as Partial<typeof formData>;
+      // Find matching service in the filtered list
       const match = availableServices.find(s => s.serviceName === val);
+      
       if (match) {
           update.unitPrice = match.unitPrice;
           update.unitCost = match.contractorCost || 0; 
           update.unitOfMeasure = match.unitOfMeasure;
+          // Auto-select Contractor if the price list entry demands it
           if(match.contractorId) update.contractorId = match.contractorId;
       }
       setFormData(prev => ({ ...prev, ...update }));
@@ -180,7 +201,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     setIsThinking(false);
   };
 
-  // Add Attachment Logic
   const handleAddAttachment = () => {
       if(!newAttachmentName || !newAttachmentUrl) return;
       const newAtt: Attachment = {
@@ -226,7 +246,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 details: `Cambió de "${initialData.status}" a "${formData.status}"`
             });
         } else {
-            // General edit log if status didn't change but saved was clicked
             updatedHistory.push({
                 date: new Date().toISOString(),
                 user: currentUserInitials,
@@ -351,7 +370,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
             </div>
 
             <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Servicio</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Servicio (Precios)</label>
               <input 
                 list="services-list" 
                 name="serviceName" 
@@ -359,11 +378,11 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 value={formData.serviceName} 
                 onChange={handleServiceSelect} 
                 className="w-full border-gray-300 rounded-lg" 
-                placeholder="Escribe o selecciona un servicio..." 
+                placeholder="Seleccione un servicio para cargar precios..." 
               />
               <datalist id="services-list">
-                  {availableServices.map(s => (
-                      <option key={s.id} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>
+                  {availableServices.map((s, idx) => (
+                      <option key={`${s.id}-${idx}`} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>
                   ))}
               </datalist>
             </div>
@@ -419,6 +438,12 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
               <input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
+            {/* RESTORED CERTIFICATION DATE FIELD */}
+            <div className="col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Certificación</label>
+              <input type="date" name="clientCertDate" value={formData.clientCertDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
+            </div>
+
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Facturación</label>
               <input type="date" name="billingDate" value={formData.billingDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
@@ -429,7 +454,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
               <textarea name="observations" rows={2} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg"></textarea>
             </div>
 
-             {/* Section 5: Documentos y Enlaces - RESTORED SECTION */}
+             {/* Section 5: Documentos y Enlaces */}
              <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Documentos y Enlaces</h3>
             </div>
@@ -493,7 +518,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 )}
             </div>
             
-            {/* AUDIT LOG SECTION - IMPROVED */}
+            {/* AUDIT LOG SECTION */}
             <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Historial de Cambios</h3>
             </div>
