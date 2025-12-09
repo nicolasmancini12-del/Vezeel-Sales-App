@@ -82,8 +82,10 @@ export interface Attachment {
 // --- NEW INTERFACE FOR PRODUCTION PROGRESS ---
 export interface ProgressLogEntry {
     id: string;
-    date: string;
+    date: string; // Production Date
     quantity: number; // Amount produced in this log
+    certificationDate?: string; // New: Specific cert date for this partial
+    billingDate?: string;       // New: Specific bill date for this partial
     notes: string;
     user: string;
 }
@@ -108,7 +110,7 @@ export interface Order {
   operationsRep: string; 
   observations: string;
   
-  // Date Fields
+  // Date Fields (Global Order Dates)
   commitmentDate?: string; 
   clientCertDate?: string; 
   billingDate?: string;    

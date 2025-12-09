@@ -50,6 +50,11 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
   const handleExportExcel = () => {
     const dataToExport = filteredOrders.map(o => {
         const progress = o.progressLogs?.reduce((acc, l) => acc + l.quantity, 0) || 0;
+        // Generate detailed progress string for Excel
+        const progressDetails = o.progressLogs?.map(l => 
+            `[${l.quantity}u el ${l.date}${l.certificationDate ? ' Cert:'+l.certificationDate : ''}${l.billingDate ? ' Fac:'+l.billingDate : ''}]`
+        ).join('; ') || '';
+
         return {
             ID: o.id,
             FechaRegistro: o.date,
@@ -62,6 +67,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
             Unidad: o.unitOfMeasure,
             Avance_Acumulado: progress,
             Avance_Porcentaje: o.quantity > 0 ? (progress / o.quantity).toFixed(2) : 0,
+            Avance_Detalle: progressDetails, // New Column with specific dates
             PrecioUnitario: o.unitPrice,
             CostoUnitario: o.unitCost || 0,
             TotalVenta: o.totalValue,
@@ -79,7 +85,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
-    const wscols = Object.keys(dataToExport[0] || {}).map(() => ({ wch: 15 }));
+    const wscols = Object.keys(dataToExport[0] || {}).map(() => ({ wch: 20 }));
     ws['!cols'] = wscols;
 
     XLSX.writeFile(wb, `NexusOrders_Export_${new Date().toISOString().split('T')[0]}.xlsx`);

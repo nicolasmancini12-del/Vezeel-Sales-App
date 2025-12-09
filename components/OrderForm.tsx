@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment, ProgressLogEntry } from '../types';
-import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2, Link as LinkIcon, ExternalLink, Activity, BarChart3 } from 'lucide-react';
+import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2, Link as LinkIcon, ExternalLink, Activity, BarChart3, Receipt, FileCheck } from 'lucide-react';
 import { analyzeTextForOrder } from '../services/geminiService';
 import { getClients, getContractors, getPriceList, getCompanies, getWorkflow, getUnits } from '../services/storageService';
 
@@ -57,6 +57,8 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   // Progress Log Inputs
   const [newProgressQty, setNewProgressQty] = useState<string>('');
   const [newProgressDate, setNewProgressDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newProgressCertDate, setNewProgressCertDate] = useState('');
+  const [newProgressBillDate, setNewProgressBillDate] = useState('');
   const [newProgressNote, setNewProgressNote] = useState('');
 
   const [aiPrompt, setAiPrompt] = useState('');
@@ -100,27 +102,21 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         if (p.company !== formData.company) return false;
         
         // 2. Client Match logic:
-        const priceClientId = p.clientId || '';
-        const formClientId = formData.clientId || '';
+        const priceClientId = p.clientId ? p.clientId.trim() : '';
+        const formClientId = formData.clientId ? formData.clientId.trim() : '';
         
-        // Handle null/undefined explicitly
-        const safePriceClient = priceClientId.trim();
-        const safeFormClient = formClientId.trim();
-
         // If price is specific to a client, it MUST match the selected client.
-        if (safePriceClient !== '' && safePriceClient !== safeFormClient) return false;
+        // If price is generic (empty), it applies to all.
+        if (priceClientId !== '' && priceClientId !== formClientId) return false;
         
         // 3. Contractor Match logic:
-        const priceContractorId = p.contractorId || '';
-        const formContractorId = formData.contractorId || '';
+        const priceContractorId = p.contractorId ? p.contractorId.trim() : '';
+        const formContractorId = formData.contractorId ? formData.contractorId.trim() : '';
 
-        const safePriceContractor = priceContractorId.trim();
-        const safeFormContractor = formContractorId.trim();
-
-        // If form has a contractor selected
-        if (safeFormContractor !== '') {
-            // Price must be either generic (no contractor) OR match this contractor
-            if (safePriceContractor !== '' && safePriceContractor !== safeFormContractor) return false;
+        // If form has a contractor selected, allow generic prices OR specific prices
+        // If no contractor selected in form, allow everything (so user can see options)
+        if (formContractorId !== '') {
+             if (priceContractorId !== '' && priceContractorId !== formContractorId) return false;
         }
 
         return true;
@@ -170,6 +166,8 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     setNewAttachmentName('');
     setNewProgressQty('');
     setNewProgressNote('');
+    setNewProgressCertDate('');
+    setNewProgressBillDate('');
   }, [initialData, isOpen, workflow, units]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -244,6 +242,8 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           id: Math.random().toString(36).substr(2, 9),
           date: newProgressDate,
           quantity: qty,
+          certificationDate: newProgressCertDate || undefined,
+          billingDate: newProgressBillDate || undefined,
           notes: newProgressNote,
           user: currentUser?.name || 'Sistema'
       };
@@ -251,6 +251,9 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       setProgressLogs([newLog, ...progressLogs]);
       setNewProgressQty('');
       setNewProgressNote('');
+      setNewProgressCertDate('');
+      setNewProgressBillDate('');
+      
       // Also add to audit log
       setHistory(prev => [
           ...prev, 
@@ -296,6 +299,15 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 user: currentUserInitials,
                 action: 'Editado',
                 details: 'Actualización de datos generales'
+            });
+        }
+        // Force an edit log if we just added history but logic didn't catch it
+        if(updatedHistory.length === history.length) {
+             updatedHistory.push({
+                date: new Date().toISOString(),
+                user: currentUserInitials,
+                action: 'Editado',
+                details: 'Actualización manual'
             });
         }
     }
@@ -504,7 +516,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
               <textarea name="observations" rows={2} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg"></textarea>
             </div>
             
-            {/* --- SECTION 5: PRODUCTION PROGRESS (NEW) --- */}
+            {/* --- SECTION 5: PRODUCTION PROGRESS (UPDATED) --- */}
             {initialData && (
                 <>
                 <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4 flex justify-between items-center">
@@ -529,66 +541,102 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                         <span>Restante: {remainingQty.toFixed(2)}</span>
                     </div>
 
-                    {/* Add Progress Input */}
-                    <div className="flex flex-col md:flex-row gap-2 items-end mb-4 border-t border-gray-200 pt-4">
-                        <div className="w-full md:w-32">
-                            <label className="text-xs text-gray-500 mb-1 block">Fecha</label>
+                    {/* Add Progress Inputs Row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 items-end mb-4 border-t border-gray-200 pt-4">
+                        <div className="col-span-1">
+                            <label className="text-[10px] text-gray-500 mb-1 block">F. Producción</label>
                             <input 
                                 type="date" 
                                 value={newProgressDate} 
                                 onChange={e => setNewProgressDate(e.target.value)} 
-                                className="w-full border border-gray-300 rounded-md p-1.5 text-sm"
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-xs"
                             />
                         </div>
-                        <div className="w-full md:w-32">
-                             <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
+                        <div className="col-span-1">
+                             <label className="text-[10px] text-gray-500 mb-1 block">Cant. Avance</label>
                              <input 
                                 type="number" 
                                 value={newProgressQty} 
                                 onChange={e => setNewProgressQty(e.target.value)} 
                                 placeholder="0.00"
-                                className="w-full border border-gray-300 rounded-md p-1.5 text-sm"
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-xs"
                             />
                         </div>
-                        <div className="flex-1 w-full">
-                             <label className="text-xs text-gray-500 mb-1 block">Nota de Avance</label>
-                             <input 
-                                type="text" 
-                                value={newProgressNote} 
-                                onChange={e => setNewProgressNote(e.target.value)} 
-                                placeholder="Ej: Producción semanal..."
-                                className="w-full border border-gray-300 rounded-md p-1.5 text-sm"
+                        <div className="col-span-1">
+                            <label className="text-[10px] text-gray-500 mb-1 block text-blue-600">F. Certificación</label>
+                            <input 
+                                type="date" 
+                                value={newProgressCertDate} 
+                                onChange={e => setNewProgressCertDate(e.target.value)} 
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-xs"
                             />
                         </div>
-                        <button 
-                            type="button" 
-                            onClick={handleAddProgress}
-                            disabled={!newProgressQty}
-                            className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-medium mb-0.5"
-                        >
-                            <Plus size={16} />
-                        </button>
+                        <div className="col-span-1">
+                            <label className="text-[10px] text-gray-500 mb-1 block text-green-600">F. Facturación</label>
+                            <input 
+                                type="date" 
+                                value={newProgressBillDate} 
+                                onChange={e => setNewProgressBillDate(e.target.value)} 
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-xs"
+                            />
+                        </div>
+                        <div className="col-span-2 md:col-span-4 lg:col-span-2">
+                             <label className="text-[10px] text-gray-500 mb-1 block">Nota</label>
+                             <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={newProgressNote} 
+                                    onChange={e => setNewProgressNote(e.target.value)} 
+                                    placeholder="Detalle..."
+                                    className="w-full border border-gray-300 rounded-md p-1.5 text-xs"
+                                />
+                                <button 
+                                    type="button" 
+                                    onClick={handleAddProgress}
+                                    disabled={!newProgressQty}
+                                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-xs font-medium"
+                                >
+                                    <Plus size={14} />
+                                </button>
+                             </div>
+                        </div>
                     </div>
 
                     {/* Progress Table */}
                     {progressLogs.length > 0 && (
-                        <div className="bg-white rounded border border-gray-200 overflow-hidden text-sm">
+                        <div className="bg-white rounded border border-gray-200 overflow-hidden">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cant.</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Nota</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Usuario</th>
+                                        <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500">Fecha Prod.</th>
+                                        <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500">Cant.</th>
+                                        <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500">Certificación</th>
+                                        <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500">Facturación</th>
+                                        <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500">Nota</th>
+                                        <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500">Usuario</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-gray-200 text-xs">
                                     {progressLogs.map((log, i) => (
                                         <tr key={i}>
-                                            <td className="px-3 py-2 text-gray-600">{log.date}</td>
-                                            <td className="px-3 py-2 font-medium text-gray-900">+{log.quantity}</td>
-                                            <td className="px-3 py-2 text-gray-500 truncate max-w-[200px]">{log.notes}</td>
-                                            <td className="px-3 py-2 text-gray-400 text-xs">{log.user}</td>
+                                            <td className="px-2 py-2 text-gray-600">{log.date}</td>
+                                            <td className="px-2 py-2 font-bold text-gray-900">+{log.quantity}</td>
+                                            <td className="px-2 py-2">
+                                                {log.certificationDate ? (
+                                                    <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-1 rounded border border-blue-100">
+                                                        <FileCheck size={10} /> {log.certificationDate}
+                                                    </span>
+                                                ) : <span className="text-gray-300">-</span>}
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                {log.billingDate ? (
+                                                     <span className="flex items-center gap-1 text-green-600 bg-green-50 px-1 rounded border border-green-100">
+                                                        <Receipt size={10} /> {log.billingDate}
+                                                    </span>
+                                                ) : <span className="text-gray-300">-</span>}
+                                            </td>
+                                            <td className="px-2 py-2 text-gray-500 truncate max-w-[150px]">{log.notes}</td>
+                                            <td className="px-2 py-2 text-gray-400">{log.user}</td>
                                         </tr>
                                     ))}
                                 </tbody>
