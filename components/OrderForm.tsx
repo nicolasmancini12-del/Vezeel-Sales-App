@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment } from '../types';
-import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2 } from 'lucide-react';
+import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { analyzeTextForOrder } from '../services/geminiService';
 import { getClients, getContractors, getPriceList, getCompanies, getWorkflow, getUnits } from '../services/storageService';
 
@@ -186,7 +186,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       const newAtt: Attachment = {
           id: Math.random().toString(36).substr(2, 9),
           name: newAttachmentName,
-          url: newAttachmentUrl,
+          url: newAttachmentUrl.startsWith('http') ? newAttachmentUrl : `https://${newAttachmentUrl}`,
           date: new Date().toISOString().split('T')[0]
       };
       setAttachments([...attachments, newAtt]);
@@ -225,7 +225,15 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 action: 'Cambio Estado',
                 details: `Cambió de "${initialData.status}" a "${formData.status}"`
             });
-        } 
+        } else {
+            // General edit log if status didn't change but saved was clicked
+            updatedHistory.push({
+                date: new Date().toISOString(),
+                user: currentUserInitials,
+                action: 'Editado',
+                details: 'Actualización de datos del pedido'
+            });
+        }
     }
 
     const orderToSave: Order = {
@@ -420,18 +428,92 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
               <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
               <textarea name="observations" rows={2} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg"></textarea>
             </div>
+
+             {/* Section 5: Documentos y Enlaces - RESTORED SECTION */}
+             <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Documentos y Enlaces</h3>
+            </div>
             
-            {/* AUDIT LOG SECTION */}
-            {history.length > 0 && (
-                <div className="col-span-1 md:col-span-3 mt-4 bg-gray-50 p-3 rounded text-xs text-gray-500 max-h-32 overflow-y-auto">
-                    <h4 className="font-bold mb-2 uppercase">Historial</h4>
-                    {history.map((h, i) => (
-                        <div key={i} className="mb-1 border-b border-gray-200 pb-1 last:border-0">
-                            <span className="font-medium">{new Date(h.date).toLocaleDateString()}</span> - {h.user}: {h.action} ({h.details})
+            <div className="col-span-1 md:col-span-3">
+                <div className="flex flex-col md:flex-row gap-2 mb-3">
+                    <input 
+                        type="text" 
+                        placeholder="Nombre (ej: Orden de Compra PDF)" 
+                        value={newAttachmentName}
+                        onChange={(e) => setNewAttachmentName(e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
+                    />
+                    <div className="flex-1 flex gap-2">
+                        <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <LinkIcon size={14} className="text-gray-400" />
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="Pegar URL (Drive, SharePoint, etc.)" 
+                                value={newAttachmentUrl}
+                                onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg p-2 pl-9 text-sm"
+                            />
                         </div>
-                    ))}
+                        <button 
+                            type="button" 
+                            onClick={handleAddAttachment}
+                            disabled={!newAttachmentName || !newAttachmentUrl}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                        >
+                            <Plus size={18} />
+                        </button>
+                    </div>
                 </div>
-            )}
+
+                {attachments.length > 0 ? (
+                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        {attachments.map((att) => (
+                            <div key={att.id} className="flex items-center justify-between bg-white p-2 rounded border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-blue-100 p-1.5 rounded text-blue-600">
+                                        <Paperclip size={14} />
+                                    </div>
+                                    <div>
+                                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
+                                            {att.name} <ExternalLink size={10} />
+                                        </a>
+                                        <p className="text-[10px] text-gray-400">{att.date}</p>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => removeAttachment(att.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-400 italic">No hay documentos adjuntos.</p>
+                )}
+            </div>
+            
+            {/* AUDIT LOG SECTION - IMPROVED */}
+            <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Historial de Cambios</h3>
+            </div>
+            <div className="col-span-1 md:col-span-3 bg-gray-50 p-3 rounded text-xs text-gray-500 max-h-40 overflow-y-auto border border-gray-200">
+                {history.length > 0 ? (
+                    <div className="space-y-2">
+                        {history.map((h, i) => (
+                            <div key={i} className="flex items-start gap-2 border-b border-gray-200 pb-2 last:border-0 last:pb-0">
+                                <div className="min-w-[80px] font-medium text-gray-700">{new Date(h.date).toLocaleDateString()}</div>
+                                <div className="flex-1">
+                                    <span className="font-bold text-gray-800">{h.user}</span>: <span className="text-gray-600">{h.action}</span>
+                                    <p className="text-gray-500 mt-0.5">{h.details}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-center italic py-2">Sin historial registrado.</p>
+                )}
+            </div>
 
           </form>
         </div>
