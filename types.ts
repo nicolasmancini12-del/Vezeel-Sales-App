@@ -32,6 +32,7 @@ export interface User {
   name: string;
   role: string; // 'Admin', 'Operaciones', 'Lector'
   initials: string;
+  accessCode?: string; // Password or PIN
 }
 
 // Master Data Types

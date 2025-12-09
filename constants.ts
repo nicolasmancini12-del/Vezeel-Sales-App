@@ -43,9 +43,9 @@ export const MOCK_SERVICES: ServiceCatalogItem[] = [
 
 // Mock Data - Users
 export const MOCK_USERS: User[] = [
-  { id: 'u1', name: 'Jane Doe', role: 'Admin', initials: 'JD' },
-  { id: 'u2', name: 'Carlos Ruiz', role: 'Operaciones', initials: 'CR' },
-  { id: 'u3', name: 'Visitante', role: 'Lector', initials: 'VI' }
+  { id: 'u1', name: 'Jane Doe', role: 'Admin', initials: 'JD', accessCode: '1234' },
+  { id: 'u2', name: 'Carlos Ruiz', role: 'Operaciones', initials: 'CR', accessCode: '1234' },
+  { id: 'u3', name: 'Visitante', role: 'Lector', initials: 'VI', accessCode: '1234' }
 ];
 
 // Mock Data - Companies

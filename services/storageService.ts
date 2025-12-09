@@ -10,7 +10,10 @@ export const initDatabase = async () => {
     if (count === 0) {
         console.log("Seeding Database...");
         await supabase.from('companies').insert(MOCK_COMPANIES);
-        await supabase.from('users').insert(MOCK_USERS);
+        // Seed users with default access code
+        const usersWithCode = MOCK_USERS.map(u => ({...u, access_code: '1234'}));
+        await supabase.from('users').insert(usersWithCode);
+        
         await supabase.from('clients').insert(MOCK_CLIENTS);
         await supabase.from('contractors').insert(MOCK_CONTRACTORS.map(c => ({...c, company: c.company || ''})));
         await supabase.from('workflow_statuses').insert(DEFAULT_WORKFLOW);
@@ -188,10 +191,23 @@ export const deleteCompany = async (id: string) => {
 // --- USERS ---
 export const getUsers = async (): Promise<User[]> => {
     const { data } = await supabase.from('users').select('*');
-    return data || [];
+    return (data || []).map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        initials: u.initials,
+        accessCode: u.access_code // Map DB column to Interface
+    }));
 };
 export const saveUser = async (item: User) => {
-    await supabase.from('users').upsert(item);
+    const dbUser = {
+        id: item.id,
+        name: item.name,
+        role: item.role,
+        initials: item.initials,
+        access_code: item.accessCode // Map Interface to DB column
+    };
+    await supabase.from('users').upsert(dbUser);
     return getUsers();
 };
 export const deleteUser = async (id: string) => {

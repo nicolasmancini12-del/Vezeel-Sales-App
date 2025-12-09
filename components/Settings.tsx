@@ -188,10 +188,6 @@ const UnitsManager = ({ readOnly }: { readOnly: boolean }) => {
     );
 };
 
-// ... Similar pattern for other managers, omitted for brevity but logic applies ...
-// For brevity in this XML response, I will implement fully functional CompaniesManager and UsersManager as examples of the async pattern, 
-// and simplify the others to follow the same pattern in a real deployment.
-
 const CompaniesManager = ({ readOnly }: { readOnly: boolean }) => {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [editing, setEditing] = useState<Partial<Company> | null>(null);
@@ -248,7 +244,10 @@ const UsersManager = ({ readOnly }: { readOnly: boolean }) => {
         const initials = (nameParts[0][0] + (nameParts[1] ? nameParts[1][0] : '')).toUpperCase();
         const toSave = { 
             id: editing.id || Math.random().toString(36).substr(2, 9),
-            name: editing.name, role: editing.role, initials 
+            name: editing.name, 
+            role: editing.role, 
+            initials,
+            accessCode: editing.accessCode || '1234'
         } as User;
         setUsers(await saveUser(toSave));
         setEditing(null);
@@ -267,7 +266,11 @@ const UsersManager = ({ readOnly }: { readOnly: boolean }) => {
                         <option value="">Rol...</option>
                         {Object.values(ROLES).map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
-                    <div className="col-span-2 flex justify-end gap-2">
+                    <div className="col-span-2">
+                        <label className="text-xs text-gray-500 mb-1 block">Código de Acceso (PIN)</label>
+                        <input className="border p-2 rounded w-full" type="text" value={editing.accessCode || ''} onChange={e => setEditing({...editing, accessCode: e.target.value})} placeholder="Ej: 1234" />
+                    </div>
+                    <div className="col-span-2 flex justify-end gap-2 mt-2">
                          <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded">Guardar</button>
                          <button onClick={() => setEditing(null)} className="bg-gray-400 text-white px-4 py-2 rounded">Cancelar</button>
                     </div>
@@ -278,7 +281,10 @@ const UsersManager = ({ readOnly }: { readOnly: boolean }) => {
                     <div key={u.id} className="flex justify-between items-center p-3 bg-white border rounded shadow-sm">
                         <div className="flex items-center gap-3">
                             <div className="bg-blue-100 text-blue-800 font-bold rounded-full w-8 h-8 flex items-center justify-center text-xs">{u.initials}</div>
-                            <div><p className="font-medium">{u.name}</p><p className="text-xs text-gray-500">{u.role}</p></div>
+                            <div>
+                                <p className="font-medium">{u.name}</p>
+                                <p className="text-xs text-gray-500">{u.role}</p>
+                            </div>
                         </div>
                         {!readOnly && <div className="flex gap-2">
                             <button onClick={() => setEditing(u)} className="text-blue-600"><Edit2 size={16}/></button>
