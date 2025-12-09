@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Order, Company, User, WorkflowStatus } from '../types';
 import StatusBadge from './StatusBadge';
@@ -47,28 +48,33 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
   }, [orders, searchTerm, companyFilter, statusFilter]);
 
   const handleExportExcel = () => {
-    const dataToExport = filteredOrders.map(o => ({
-      ID: o.id,
-      FechaRegistro: o.date,
-      EmpresaVendedora: o.company,
-      Cliente: o.clientName,
-      OC: o.poNumber,
-      Servicio: o.serviceName,
-      DetalleID_Servicio: o.serviceDetails || '',
-      Cantidad: o.quantity,
-      Unidad: o.unitOfMeasure,
-      PrecioUnitario: o.unitPrice,
-      CostoUnitario: o.unitCost || 0,
-      TotalVenta: o.totalValue,
-      Contratista: o.contractorName,
-      Estado: o.status,
-      Responsable: o.operationsRep,
-      FechaCompromiso: o.commitmentDate,
-      FechaCertificacion: o.clientCertDate,
-      FechaFacturacion: o.billingDate,
-      Observaciones: o.observations,
-      Adjuntos: o.attachments?.map(a => a.name).join(', ') || ''
-    }));
+    const dataToExport = filteredOrders.map(o => {
+        const progress = o.progressLogs?.reduce((acc, l) => acc + l.quantity, 0) || 0;
+        return {
+            ID: o.id,
+            FechaRegistro: o.date,
+            EmpresaVendedora: o.company,
+            Cliente: o.clientName,
+            OC: o.poNumber,
+            Servicio: o.serviceName,
+            DetalleID_Servicio: o.serviceDetails || '',
+            Cantidad: o.quantity,
+            Unidad: o.unitOfMeasure,
+            Avance_Acumulado: progress,
+            Avance_Porcentaje: o.quantity > 0 ? (progress / o.quantity).toFixed(2) : 0,
+            PrecioUnitario: o.unitPrice,
+            CostoUnitario: o.unitCost || 0,
+            TotalVenta: o.totalValue,
+            Contratista: o.contractorName,
+            Estado: o.status,
+            Responsable: o.operationsRep,
+            FechaCompromiso: o.commitmentDate,
+            FechaCertificacion: o.clientCertDate,
+            FechaFacturacion: o.billingDate,
+            Observaciones: o.observations,
+            Adjuntos: o.attachments?.map(a => a.name).join(', ') || ''
+        };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -150,7 +156,11 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                         No se encontraron pedidos.
                     </td>
                 </tr>
-            ) : filteredOrders.map((order) => (
+            ) : filteredOrders.map((order) => {
+              const progress = order.progressLogs?.reduce((acc, l) => acc + l.quantity, 0) || 0;
+              const percent = order.quantity > 0 ? (progress / order.quantity) * 100 : 0;
+              
+              return (
               <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2">
@@ -169,7 +179,16 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">${order.totalValue.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">{order.quantity} {order.unitOfMeasure}</div>
+                  <div className="text-xs text-gray-500 mb-1">{order.quantity} {order.unitOfMeasure}</div>
+                  
+                  {/* Progress Bar Indicator */}
+                  <div className="w-24 bg-gray-200 rounded-full h-1.5 overflow-hidden" title={`Avance: ${progress} / ${order.quantity}`}>
+                      <div 
+                         className={`h-1.5 rounded-full ${percent >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} 
+                         style={{width: `${Math.min(percent, 100)}%`}}
+                      ></div>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{Math.round(percent)}%</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={order.status} />
@@ -187,7 +206,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                   )}
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

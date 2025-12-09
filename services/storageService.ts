@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabaseClient';
 import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem } from '../types';
 import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE, MOCK_SERVICES } from '../constants';
@@ -62,7 +63,8 @@ export const initDatabase = async () => {
              client_cert_date: o.clientCertDate,
              billing_date: o.billingDate,
              history: o.history,
-             attachments: o.attachments
+             attachments: o.attachments,
+             progress_logs: [] // Init empty
         }));
         await supabase.from('orders').insert(seedOrders);
     }
@@ -90,7 +92,8 @@ export const getOrders = async (): Promise<Order[]> => {
         operationsRep: d.operations_rep,
         commitmentDate: d.commitment_date,
         clientCertDate: d.client_cert_date,
-        billingDate: d.billing_date
+        billingDate: d.billing_date,
+        progressLogs: d.progress_logs || []
     }));
 };
 
@@ -119,7 +122,8 @@ export const saveOrder = async (order: Order): Promise<Order[]> => {
              client_cert_date: order.clientCertDate,
              billing_date: order.billingDate,
              history: order.history,
-             attachments: order.attachments
+             attachments: order.attachments,
+             progress_logs: order.progressLogs
     };
 
     const { error } = await supabase.from('orders').upsert(dbOrder);
@@ -310,7 +314,7 @@ export const exportBackup = async () => {
         orders: o, clients: c, contractors: ct, companies: co, prices: p,
         users: u, workflow: w, units: un, services: s,
         timestamp: new Date().toISOString(),
-        version: '1.4-cloud'
+        version: '1.6-cloud'
     };
     return JSON.stringify(backupData, null, 2);
 };

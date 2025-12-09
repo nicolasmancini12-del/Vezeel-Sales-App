@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment } from '../types';
-import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment, ProgressLogEntry } from '../types';
+import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2, Link as LinkIcon, ExternalLink, Activity, BarChart3 } from 'lucide-react';
 import { analyzeTextForOrder } from '../services/geminiService';
 import { getClients, getContractors, getPriceList, getCompanies, getWorkflow, getUnits } from '../services/storageService';
 
@@ -47,8 +48,16 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
   const [history, setHistory] = useState<OrderHistoryEntry[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [progressLogs, setProgressLogs] = useState<ProgressLogEntry[]>([]);
+  
+  // Attachment Inputs
   const [newAttachmentUrl, setNewAttachmentUrl] = useState('');
   const [newAttachmentName, setNewAttachmentName] = useState('');
+
+  // Progress Log Inputs
+  const [newProgressQty, setNewProgressQty] = useState<string>('');
+  const [newProgressDate, setNewProgressDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newProgressNote, setNewProgressNote] = useState('');
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -84,7 +93,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     }
   }, [isOpen]);
 
-  // Filter Price List Logic - IMPROVED ROBUSTNESS
+  // Filter Price List Logic
   useEffect(() => {
     const filtered = priceList.filter(p => {
         // 1. Company Match (Mandatory)
@@ -94,19 +103,24 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         const priceClientId = p.clientId || '';
         const formClientId = formData.clientId || '';
         
-        // If price is specific to a client, it MUST match the selected client.
-        if (priceClientId !== '' && priceClientId !== formClientId) return false;
-        // If price is generic (priceClientId === ''), it passes.
+        // Handle null/undefined explicitly
+        const safePriceClient = priceClientId.trim();
+        const safeFormClient = formClientId.trim();
 
+        // If price is specific to a client, it MUST match the selected client.
+        if (safePriceClient !== '' && safePriceClient !== safeFormClient) return false;
+        
         // 3. Contractor Match logic:
         const priceContractorId = p.contractorId || '';
         const formContractorId = formData.contractorId || '';
 
-        // If the user HAS selected a contractor
-        if (formContractorId !== '') {
-            // Filter out prices that are for a DIFFERENT contractor
-            // (Keep Generic Prices AND Prices for this Contractor)
-            if (priceContractorId !== '' && priceContractorId !== formContractorId) return false;
+        const safePriceContractor = priceContractorId.trim();
+        const safeFormContractor = formContractorId.trim();
+
+        // If form has a contractor selected
+        if (safeFormContractor !== '') {
+            // Price must be either generic (no contractor) OR match this contractor
+            if (safePriceContractor !== '' && safePriceContractor !== safeFormContractor) return false;
         }
 
         return true;
@@ -117,7 +131,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   // Load initial data
   useEffect(() => {
     if (initialData) {
-      const { id, totalValue, clientName, contractorName, history: initHistory, attachments: initAttachments, ...rest } = initialData;
+      const { id, totalValue, clientName, contractorName, history: initHistory, attachments: initAttachments, progressLogs: initProgress, ...rest } = initialData;
       setFormData({
           ...rest,
           unitCost: initialData.unitCost || 0,
@@ -127,6 +141,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       });
       setHistory(initHistory || []);
       setAttachments(initAttachments || []);
+      setProgressLogs(initProgress || []);
     } else {
         setFormData(prev => ({
             date: new Date().toISOString().split('T')[0],
@@ -149,9 +164,12 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         }));
         setHistory([]);
         setAttachments([]);
+        setProgressLogs([]);
     }
     setNewAttachmentUrl('');
     setNewAttachmentName('');
+    setNewProgressQty('');
+    setNewProgressNote('');
   }, [initialData, isOpen, workflow, units]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -218,6 +236,33 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       setAttachments(attachments.filter(a => a.id !== id));
   };
 
+  const handleAddProgress = () => {
+      const qty = parseFloat(newProgressQty);
+      if(!qty || qty <= 0) return;
+
+      const newLog: ProgressLogEntry = {
+          id: Math.random().toString(36).substr(2, 9),
+          date: newProgressDate,
+          quantity: qty,
+          notes: newProgressNote,
+          user: currentUser?.name || 'Sistema'
+      };
+      
+      setProgressLogs([newLog, ...progressLogs]);
+      setNewProgressQty('');
+      setNewProgressNote('');
+      // Also add to audit log
+      setHistory(prev => [
+          ...prev, 
+          {
+              date: new Date().toISOString(),
+              user: currentUser?.name || 'Sistema',
+              action: 'Avance',
+              details: `Reportado avance de ${qty} ${formData.unitOfMeasure}`
+          }
+      ]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -245,12 +290,12 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 action: 'Cambio Estado',
                 details: `Cambió de "${initialData.status}" a "${formData.status}"`
             });
-        } else {
+        } else if (JSON.stringify(initialData) !== JSON.stringify(formData)) {
             updatedHistory.push({
                 date: new Date().toISOString(),
                 user: currentUserInitials,
                 action: 'Editado',
-                details: 'Actualización de datos del pedido'
+                details: 'Actualización de datos generales'
             });
         }
     }
@@ -263,12 +308,18 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       contractorName: contractorObj ? contractorObj.name : 'No Asignado',
       totalValue,
       history: updatedHistory,
-      attachments: attachments
+      attachments: attachments,
+      progressLogs: progressLogs
     };
     
     await onSubmit(orderToSave);
     setIsSubmitting(false);
   };
+
+  // Progress Calculations
+  const totalProduced = progressLogs.reduce((acc, log) => acc + log.quantity, 0);
+  const progressPercent = formData.quantity > 0 ? Math.min((totalProduced / formData.quantity) * 100, 100) : 0;
+  const remainingQty = Math.max(formData.quantity - totalProduced, 0);
 
   if (!isOpen) return null;
 
@@ -412,7 +463,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
             </div>
 
             <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad Total</label>
                 <input type="number" step="0.01" name="quantity" required value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
@@ -438,7 +489,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
               <input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
-            {/* RESTORED CERTIFICATION DATE FIELD */}
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Certificación</label>
               <input type="date" name="clientCertDate" value={formData.clientCertDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
@@ -453,8 +503,103 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
               <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
               <textarea name="observations" rows={2} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg"></textarea>
             </div>
+            
+            {/* --- SECTION 5: PRODUCTION PROGRESS (NEW) --- */}
+            {initialData && (
+                <>
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4 flex justify-between items-center">
+                    <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                        <Activity size={16} /> Producción / Avance
+                    </h3>
+                    <div className="text-xs font-medium text-gray-600">
+                        {totalProduced} / {formData.quantity} {formData.unitOfMeasure}
+                    </div>
+                </div>
 
-             {/* Section 5: Documentos y Enlaces */}
+                <div className="col-span-1 md:col-span-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    {/* Visual Progress Bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden">
+                        <div 
+                            className={`h-4 rounded-full transition-all duration-500 ${progressPercent >= 100 ? 'bg-green-500' : 'bg-blue-600'}`}
+                            style={{ width: `${progressPercent}%` }}
+                        ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-4">
+                        <span>Completado: {progressPercent.toFixed(1)}%</span>
+                        <span>Restante: {remainingQty.toFixed(2)}</span>
+                    </div>
+
+                    {/* Add Progress Input */}
+                    <div className="flex flex-col md:flex-row gap-2 items-end mb-4 border-t border-gray-200 pt-4">
+                        <div className="w-full md:w-32">
+                            <label className="text-xs text-gray-500 mb-1 block">Fecha</label>
+                            <input 
+                                type="date" 
+                                value={newProgressDate} 
+                                onChange={e => setNewProgressDate(e.target.value)} 
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-sm"
+                            />
+                        </div>
+                        <div className="w-full md:w-32">
+                             <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
+                             <input 
+                                type="number" 
+                                value={newProgressQty} 
+                                onChange={e => setNewProgressQty(e.target.value)} 
+                                placeholder="0.00"
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-sm"
+                            />
+                        </div>
+                        <div className="flex-1 w-full">
+                             <label className="text-xs text-gray-500 mb-1 block">Nota de Avance</label>
+                             <input 
+                                type="text" 
+                                value={newProgressNote} 
+                                onChange={e => setNewProgressNote(e.target.value)} 
+                                placeholder="Ej: Producción semanal..."
+                                className="w-full border border-gray-300 rounded-md p-1.5 text-sm"
+                            />
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={handleAddProgress}
+                            disabled={!newProgressQty}
+                            className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-medium mb-0.5"
+                        >
+                            <Plus size={16} />
+                        </button>
+                    </div>
+
+                    {/* Progress Table */}
+                    {progressLogs.length > 0 && (
+                        <div className="bg-white rounded border border-gray-200 overflow-hidden text-sm">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cant.</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Nota</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Usuario</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {progressLogs.map((log, i) => (
+                                        <tr key={i}>
+                                            <td className="px-3 py-2 text-gray-600">{log.date}</td>
+                                            <td className="px-3 py-2 font-medium text-gray-900">+{log.quantity}</td>
+                                            <td className="px-3 py-2 text-gray-500 truncate max-w-[200px]">{log.notes}</td>
+                                            <td className="px-3 py-2 text-gray-400 text-xs">{log.user}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                </>
+            )}
+
+             {/* Section 6: Documentos y Enlaces */}
              <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Documentos y Enlaces</h3>
             </div>

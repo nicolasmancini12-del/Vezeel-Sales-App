@@ -79,6 +79,15 @@ export interface Attachment {
   date: string;
 }
 
+// --- NEW INTERFACE FOR PRODUCTION PROGRESS ---
+export interface ProgressLogEntry {
+    id: string;
+    date: string;
+    quantity: number; // Amount produced in this log
+    notes: string;
+    user: string;
+}
+
 export interface Order {
   id: string;
   date: string; // ISO String - Creation Date
@@ -107,9 +116,10 @@ export interface Order {
   // New Fields
   history?: OrderHistoryEntry[];
   attachments?: Attachment[];
+  progressLogs?: ProgressLogEntry[]; // Production progress
 }
 
-export type OrderFormData = Omit<Order, 'id' | 'totalValue' | 'clientName' | 'contractorName' | 'history' | 'attachments'>;
+export type OrderFormData = Omit<Order, 'id' | 'totalValue' | 'clientName' | 'contractorName' | 'history' | 'attachments' | 'progressLogs'>;
 
 export interface DashboardStats {
   totalRevenue: number;
