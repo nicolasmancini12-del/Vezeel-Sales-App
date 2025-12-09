@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Order, Company, User, WorkflowStatus } from '../types';
 import StatusBadge from './StatusBadge';
@@ -22,8 +21,11 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
   const [workflow, setWorkflow] = useState<WorkflowStatus[]>([]);
 
   useEffect(() => {
-      setCompanies(getCompanies());
-      setWorkflow(getWorkflow());
+      // Async load for filters
+      (async () => {
+          setCompanies(await getCompanies());
+          setWorkflow(await getWorkflow());
+      })();
   }, []);
 
   const canEdit = currentUser?.role !== ROLES.VIEWER;
@@ -71,8 +73,6 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
-    
-    // Auto-width columns
     const wscols = Object.keys(dataToExport[0] || {}).map(() => ({ wch: 15 }));
     ws['!cols'] = wscols;
 
@@ -123,7 +123,6 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
           <button 
             onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors shadow-sm ml-2"
-            title="Descargar Excel"
           >
               <Download size={16} />
               <span className="hidden md:inline">Excel</span>
@@ -148,14 +147,14 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
             {filteredOrders.length === 0 ? (
                 <tr>
                     <td colSpan={6} className="px-6 py-10 text-center text-gray-500 text-sm">
-                        No se encontraron pedidos que coincidan con los filtros.
+                        No se encontraron pedidos.
                     </td>
                 </tr>
             ) : filteredOrders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2">
-                      <div className="text-sm font-medium text-gray-900">{order.id}</div>
+                      <div className="text-sm font-medium text-gray-900">{order.id.slice(0,8)}...</div>
                       {order.attachments && order.attachments.length > 0 && (
                           <Paperclip size={14} className="text-blue-500" />
                       )}
@@ -165,13 +164,12 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm font-semibold text-gray-900">{order.clientName}</div>
-                  <div className="text-sm text-gray-600 truncate max-w-xs" title={order.serviceName}>{order.serviceName}</div>
-                  {order.serviceDetails && <div className="text-xs text-indigo-600 font-medium mt-0.5">{order.serviceDetails}</div>}
+                  <div className="text-sm text-gray-600 truncate max-w-xs">{order.serviceName}</div>
                   {order.poNumber && <div className="text-xs text-gray-500 mt-0.5">OC: {order.poNumber}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">${order.totalValue.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">{order.quantity} {order.unitOfMeasure} @ {order.unitPrice}</div>
+                  <div className="text-xs text-gray-500">{order.quantity} {order.unitOfMeasure}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={order.status} />
@@ -183,18 +181,8 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   {canEdit && (
                       <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => onEdit(order)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded-md hover:bg-blue-50 transition-colors"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => onDelete(order.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-900 p-1"><Edit2 size={16} /></button>
+                        <button onClick={() => onDelete(order.id)} className="text-red-600 hover:text-red-900 p-1"><Trash2 size={16} /></button>
                       </div>
                   )}
                 </td>

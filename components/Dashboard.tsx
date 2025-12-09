@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 import { Order } from '../types';
-import { DollarSign, Briefcase, Activity, CheckCircle, TrendingUp } from 'lucide-react';
+import { DollarSign, Activity, CheckCircle, TrendingUp } from 'lucide-react';
 
 interface Props {
   orders: Order[];
@@ -63,7 +62,8 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
       const revenue = order.totalValue;
       const cost = (order.unitCost || 0) * order.quantity;
       const margin = revenue - cost;
-      acc[order.clientName] = (acc[order.clientName] || 0) + margin;
+      const name = order.clientName || 'Sin Cliente';
+      acc[name] = (acc[name] || 0) + margin;
       return acc;
   }, {} as Record<string, number>);
 
@@ -77,7 +77,8 @@ const Dashboard: React.FC<Props> = ({ orders }) => {
       const revenue = order.totalValue;
       const cost = (order.unitCost || 0) * order.quantity;
       const margin = revenue - cost;
-      acc[order.serviceName] = (acc[order.serviceName] || 0) + margin;
+      const name = order.serviceName || 'Sin Servicio';
+      acc[name] = (acc[name] || 0) + margin;
       return acc;
   }, {} as Record<string, number>);
 

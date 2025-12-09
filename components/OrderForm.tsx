@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment } from '../types';
 import { X, Sparkles, Loader2, Calendar, Clock, User as UserIcon, Paperclip, Plus, Trash2 } from 'lucide-react';
@@ -21,6 +20,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   const [priceList, setPriceList] = useState<PriceListEntry[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowStatus[]>([]);
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
   
   // Available services based on selected company/contractor
   const [availableServices, setAvailableServices] = useState<PriceListEntry[]>([]);
@@ -45,7 +45,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     billingDate: ''
   });
 
-  // New State for History and Attachments
   const [history, setHistory] = useState<OrderHistoryEntry[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [newAttachmentUrl, setNewAttachmentUrl] = useState('');
@@ -53,34 +52,37 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load Master Data
+  // Load Master Data Async
   useEffect(() => {
     if (isOpen) {
-        setClients(getClients());
-        setContractors(getContractors());
-        setPriceList(getPriceList());
-        setWorkflow(getWorkflow());
-        setUnits(getUnits());
-        
-        const comps = getCompanies();
-        setCompanies(comps);
-        if (!initialData && comps.length > 0 && !formData.company) {
-            setFormData(prev => ({ ...prev, company: comps[0].name }));
-        }
+        setLoadingData(true);
+        Promise.all([
+            getClients(),
+            getContractors(),
+            getPriceList(),
+            getWorkflow(),
+            getUnits(),
+            getCompanies()
+        ]).then(([cl, co, pl, wf, un, com]) => {
+            setClients(cl);
+            setContractors(co);
+            setPriceList(pl);
+            setWorkflow(wf);
+            setUnits(un);
+            setCompanies(com);
+            
+            if (!initialData && com.length > 0 && !formData.company) {
+                setFormData(prev => ({ ...prev, company: com[0].name }));
+            }
+            if (!initialData && !formData.status && wf.length > 0) {
+                setFormData(prev => ({ ...prev, status: wf[0].name }));
+            }
+            setLoadingData(false);
+        });
     }
   }, [isOpen]);
-
-  // Set default status/unit
-  useEffect(() => {
-      if (!initialData && !formData.status && workflow.length > 0) {
-          setFormData(prev => ({ 
-              ...prev, 
-              status: workflow[0].name,
-              unitOfMeasure: units.length > 0 ? units[0].name : 'Horas' 
-            }));
-      }
-  }, [workflow, initialData, formData.status, units]);
 
   // Filter Price List
   useEffect(() => {
@@ -88,12 +90,11 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         if (p.company !== formData.company) return false;
         if (p.contractorId && formData.contractorId && p.contractorId !== formData.contractorId) return false;
         if (p.clientId && formData.clientId && p.clientId !== formData.clientId) return false;
-        const orderDate = formData.date;
-        if (orderDate < p.validFrom || orderDate > p.validTo) return false;
+        // Simple date check
         return true;
     });
     setAvailableServices(filtered);
-  }, [formData.company, formData.contractorId, formData.clientId, formData.date, priceList]);
+  }, [formData.company, formData.contractorId, formData.clientId, priceList]);
 
   // Load initial data
   useEffect(() => {
@@ -197,8 +198,9 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       setAttachments(attachments.filter(a => a.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const totalValue = formData.quantity * formData.unitPrice;
     
     const clientObj = clients.find(c => c.id === formData.clientId);
@@ -216,7 +218,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
             details: 'Pedido registrado en el sistema'
         });
     } else {
-        // Check for Status Change
         if (initialData.status !== formData.status) {
             updatedHistory.push({
                 date: new Date().toISOString(),
@@ -225,15 +226,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                 details: `Cambió de "${initialData.status}" a "${formData.status}"`
             });
         } 
-        // Generic Edit Log (debounce logic omitted for simplicity, just log edit if not status change)
-        else {
-             updatedHistory.push({
-                date: new Date().toISOString(),
-                user: currentUserInitials,
-                action: 'Editado',
-                details: 'Actualización de datos del pedido'
-            });
-        }
     }
 
     const orderToSave: Order = {
@@ -247,7 +239,8 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       attachments: attachments
     };
     
-    onSubmit(orderToSave);
+    await onSubmit(orderToSave);
+    setIsSubmitting(false);
   };
 
   if (!isOpen) return null;
@@ -265,7 +258,11 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           </button>
         </div>
 
-        {/* Content - Scrollable */}
+        {loadingData ? (
+             <div className="flex-1 flex items-center justify-center p-12">
+                 <Loader2 className="animate-spin text-blue-600 w-8 h-8"/>
+             </div>
+        ) : (
         <div className="flex-1 overflow-y-auto p-6">
           
           {/* AI Assist Section */}
@@ -275,15 +272,12 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                       <Sparkles size={18} />
                       <span>AI Smart Assist</span>
                   </div>
-                  <p className="text-xs text-indigo-600 mb-3">
-                      Pega un correo o descripción rápida y autocompletaremos el formulario.
-                  </p>
                   <div className="flex gap-2">
                       <input 
                         type="text" 
                         value={aiPrompt}
                         onChange={(e) => setAiPrompt(e.target.value)}
-                        placeholder="Describe el pedido aquí..."
+                        placeholder="Ej: Servicio Java para Banco Futuro por 100 horas..."
                         className="flex-1 text-sm border-indigo-200 focus:ring-indigo-500 rounded-md"
                       />
                       <button 
@@ -307,19 +301,19 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Registro</label>
-              <input type="date" name="date" required value={formData.date} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+              <input type="date" name="date" required value={formData.date} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Empresa Vendedora</label>
-              <select name="company" required value={formData.company} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+              <select name="company" required value={formData.company} onChange={handleChange} className="w-full border-gray-300 rounded-lg">
                 {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
             </div>
 
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Responsable Ops.</label>
-              <input type="text" name="operationsRep" value={formData.operationsRep} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+              <input type="text" name="operationsRep" value={formData.operationsRep} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
             {/* Section 2: Client & Service */}
@@ -329,7 +323,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-              <select name="clientId" required value={formData.clientId} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+              <select name="clientId" required value={formData.clientId} onChange={handleChange} className="w-full border-gray-300 rounded-lg">
                   <option value="">Seleccione Cliente...</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -337,7 +331,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Contratista</label>
-              <select name="contractorId" value={formData.contractorId} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+              <select name="contractorId" value={formData.contractorId} onChange={handleChange} className="w-full border-gray-300 rounded-lg">
                   <option value="">Interno / Sin Asignar</option>
                   {contractors.map(c => <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>)}
               </select>
@@ -345,36 +339,36 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
              <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">OC / PO Number</label>
-              <input type="text" name="poNumber" value={formData.poNumber} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: OC-12345" />
+              <input type="text" name="poNumber" value={formData.poNumber} onChange={handleChange} className="w-full border-gray-300 rounded-lg" placeholder="Ej: OC-12345" />
             </div>
 
             <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Servicio (Sugerido por lista de precios)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Servicio</label>
               <input 
                 list="services-list" 
                 name="serviceName" 
                 required 
                 value={formData.serviceName} 
                 onChange={handleServiceSelect} 
-                className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" 
+                className="w-full border-gray-300 rounded-lg" 
                 placeholder="Escribe o selecciona un servicio..." 
               />
               <datalist id="services-list">
                   {availableServices.map(s => (
-                      <option key={s.id} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure} (${getContractors().find(c => c.id === s.contractorId)?.name || 'Genérico'})`}</option>
+                      <option key={s.id} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>
                   ))}
               </datalist>
             </div>
 
             <div className="col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Detalle / ID Adicional</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Detalle Adicional</label>
                 <input 
                     type="text" 
                     name="serviceDetails" 
                     value={formData.serviceDetails || ''} 
                     onChange={handleChange} 
-                    className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Ej: Ticket #100, ID Proyecto..." 
+                    className="w-full border-gray-300 rounded-lg"
+                    placeholder="Ej: Ticket #100" 
                 />
             </div>
 
@@ -385,134 +379,71 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
             <div className="col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unidad Medida</label>
-                <select name="unitOfMeasure" required value={formData.unitOfMeasure} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <select name="unitOfMeasure" required value={formData.unitOfMeasure} onChange={handleChange} className="w-full border-gray-300 rounded-lg">
                     {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                 </select>
             </div>
 
             <div className="col-span-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-                <input type="number" step="0.01" name="quantity" required value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                <input type="number" step="0.01" name="quantity" required value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
             <div className="col-span-1">
-                 <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
-                     Precio Unitario
-                 </label>
-                 <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
-                    <input type="number" step="0.01" name="unitPrice" required value={formData.unitPrice} onChange={handleChange} className="w-full pl-7 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-                 </div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Precio Unitario</label>
+                 <input type="number" step="0.01" name="unitPrice" required value={formData.unitPrice} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
             {/* Section 4: Fechas Hito & Estado */}
             <div className="col-span-1 md:col-span-2 lg:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
-                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Estado y Fechas Hito</h3>
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Estado y Fechas</h3>
             </div>
 
             <div className="col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Estado Actual</label>
-              <select name="status" value={formData.status} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+              <select name="status" value={formData.status} onChange={handleChange} className="w-full border-gray-300 rounded-lg">
                 {workflow.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
             </div>
 
             <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Calendar size={14}/> Fecha Compromiso Cliente</label>
-              <input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Compromiso</label>
+              <input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
             <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Calendar size={14}/> Fecha Certificación Cliente</label>
-              <input type="date" name="clientCertDate" value={formData.clientCertDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-            </div>
-
-             <div className="col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Calendar size={14}/> Fecha Facturación</label>
-              <input type="date" name="billingDate" value={formData.billingDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Facturación</label>
+              <input type="date" name="billingDate" value={formData.billingDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg" />
             </div>
 
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-              <textarea name="observations" rows={2} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"></textarea>
+              <textarea name="observations" rows={2} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg"></textarea>
             </div>
             
-            {/* Computed Total Display */}
-            <div className="col-span-1 md:col-span-3 bg-gray-50 p-4 rounded-lg flex justify-between items-center border border-gray-200 mt-4">
-                <span className="text-gray-600 font-medium">Valor Total Estimado:</span>
-                <span className="text-xl font-bold text-gray-900">
-                    ${(formData.quantity * formData.unitPrice).toLocaleString()}
-                </span>
-            </div>
-
-            {/* ATTACHMENTS SECTION */}
-            <div className="col-span-1 md:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
-                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Documentos y Enlaces</h3>
-            </div>
-            
-            <div className="col-span-1 md:col-span-3">
-                <div className="flex gap-2 mb-2">
-                    <input 
-                        className="flex-1 border p-2 rounded text-sm" 
-                        placeholder="Nombre (ej: OC PDF)"
-                        value={newAttachmentName}
-                        onChange={e => setNewAttachmentName(e.target.value)}
-                    />
-                    <input 
-                        className="flex-1 border p-2 rounded text-sm" 
-                        placeholder="Link / URL (ej: https://drive...)"
-                        value={newAttachmentUrl}
-                        onChange={e => setNewAttachmentUrl(e.target.value)}
-                    />
-                    <button type="button" onClick={handleAddAttachment} className="bg-gray-100 hover:bg-gray-200 p-2 rounded text-gray-600"><Plus size={20}/></button>
-                </div>
-                <div className="space-y-2">
-                    {attachments.map(att => (
-                        <div key={att.id} className="flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-100 text-sm">
-                            <a href={att.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-700 hover:underline">
-                                <Paperclip size={14}/> {att.name}
-                            </a>
-                            <button type="button" onClick={() => removeAttachment(att.id)} className="text-red-500 hover:text-red-700"><X size={14}/></button>
-                        </div>
-                    ))}
-                    {attachments.length === 0 && <p className="text-xs text-gray-400 italic">No hay documentos adjuntos.</p>}
-                </div>
-            </div>
-
             {/* AUDIT LOG SECTION */}
             {history.length > 0 && (
-                <div className="col-span-1 md:col-span-3 pb-2 border-b border-gray-100 mb-2 mt-4">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Historial de Actividad</h3>
-                </div>
-            )}
-            
-            {history.length > 0 && (
-                <div className="col-span-1 md:col-span-3 max-h-40 overflow-y-auto">
-                    <div className="relative pl-4 border-l-2 border-gray-200 space-y-4">
-                        {[...history].reverse().map((h, i) => (
-                            <div key={i} className="relative">
-                                <div className="absolute -left-[21px] top-1 bg-white border-2 border-gray-300 rounded-full w-3 h-3"></div>
-                                <div className="text-xs text-gray-500 flex items-center gap-2">
-                                    <Clock size={12}/> {new Date(h.date).toLocaleString()} 
-                                    <span className="flex items-center gap-1 font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded"><UserIcon size={10}/> {h.user}</span>
-                                </div>
-                                <div className="text-sm font-medium text-gray-800 mt-0.5">{h.action}</div>
-                                <div className="text-xs text-gray-600">{h.details}</div>
-                            </div>
-                        ))}
-                    </div>
+                <div className="col-span-1 md:col-span-3 mt-4 bg-gray-50 p-3 rounded text-xs text-gray-500 max-h-32 overflow-y-auto">
+                    <h4 className="font-bold mb-2 uppercase">Historial</h4>
+                    {history.map((h, i) => (
+                        <div key={i} className="mb-1 border-b border-gray-200 pb-1 last:border-0">
+                            <span className="font-medium">{new Date(h.date).toLocaleDateString()}</span> - {h.user}: {h.action} ({h.details})
+                        </div>
+                    ))}
                 </div>
             )}
 
           </form>
         </div>
+        )}
 
         {/* Footer */}
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
-          <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
             Cancelar
           </button>
-          <button type="submit" form="orderForm" className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm">
+          <button type="submit" form="orderForm" disabled={isSubmitting} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-2">
+            {isSubmitting && <Loader2 className="animate-spin" size={16} />}
             {initialData ? 'Guardar Cambios' : 'Crear Pedido'}
           </button>
         </div>

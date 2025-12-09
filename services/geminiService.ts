@@ -1,12 +1,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const analyzeTextForOrder = async (text: string) => {
-  if (!process.env.API_KEY) {
-    console.warn("No API_KEY found for Gemini.");
+  // Verificación segura para evitar que la App se rompa si process no existe en el navegador
+  // Nota: Para que esto funcione en Vercel + Vite, asegúrate de que la variable de entorno
+  // esté expuesta (usualmente requiere prefijo VITE_ o configuración en vite.config.ts)
+  // Por ahora, esto evita el crash (pantalla blanca).
+  const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : null;
+
+  if (!apiKey) {
+    console.warn("No API_KEY found for Gemini. AI features disabled.");
     return null;
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({

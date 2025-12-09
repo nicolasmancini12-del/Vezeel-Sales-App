@@ -1,5 +1,5 @@
 
-import { Company, Client, Contractor, PriceListEntry, User, WorkflowStatus, ServiceCatalogItem } from './types';
+import { Company, Client, Contractor, PriceListEntry, User, WorkflowStatus, ServiceCatalogItem, Order } from './types';
 
 export const ROLES = {
   ADMIN: 'Admin',
@@ -111,7 +111,7 @@ export const MOCK_PRICE_LIST: PriceListEntry[] = [
 ];
 
 // Seed Data Orders
-export const MOCK_ORDERS = [
+export const MOCK_ORDERS: Order[] = [
   {
     id: '1001',
     date: '2023-10-01',

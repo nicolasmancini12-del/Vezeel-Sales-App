@@ -1,55 +1,56 @@
-
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, List, Plus, Layers, Settings as SettingsIcon, ChevronDown, User as UserIcon } from 'lucide-react';
+import { LayoutDashboard, List, Plus, Layers, Settings as SettingsIcon, ChevronDown, User as UserIcon, LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import OrderList from './components/OrderList';
 import OrderForm from './components/OrderForm';
 import Settings from './components/Settings';
+import Login from './components/Login';
 import { getOrders, saveOrder, deleteOrder, getUsers } from './services/storageService';
 import { Order, User } from './types';
 import { ROLES } from './constants';
 
 function App() {
+  // 1. ALL STATES (HOOKS) MUST BE DECLARED FIRST
   const [currentView, setCurrentView] = useState<'dashboard' | 'orders' | 'settings'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   // User State
-  const [users, setUsers] = useState<User[]>([]);
   const [activeUser, setActiveUser] = useState<User | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Initial Load
+  // 2. EFFECTS
+  // Load orders only when a user is active
   useEffect(() => {
-    setOrders(getOrders());
-    const loadedUsers = getUsers();
-    setUsers(loadedUsers);
-    if (loadedUsers.length > 0) {
-        setActiveUser(loadedUsers[0]);
+    if (activeUser) {
+      loadOrders();
     }
-  }, []);
+  }, [activeUser]);
 
-  // Reload users when entering settings
-  useEffect(() => {
-      if (currentView === 'settings') {
-         const interval = setInterval(() => {
-             const latest = getUsers();
-             if (JSON.stringify(latest) !== JSON.stringify(users)) {
-                 setUsers(latest);
-             }
-         }, 2000);
-         return () => clearInterval(interval);
+  // 3. HELPER FUNCTIONS
+  const loadOrders = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getOrders();
+        setOrders(data);
+      } catch(e) {
+          console.error("Failed to load orders", e);
+      } finally {
+          setIsLoading(false);
       }
-  }, [currentView, users]);
+  };
 
   const canEdit = activeUser?.role !== ROLES.VIEWER;
 
-  const handleCreateOrder = (order: Order) => {
-    const updatedList = saveOrder(order);
+  const handleCreateOrder = async (order: Order) => {
+    setIsLoading(true);
+    const updatedList = await saveOrder(order);
     setOrders(updatedList);
     setIsFormOpen(false);
     setEditingOrder(null);
+    setIsLoading(false);
   };
 
   const handleEditOrder = (order: Order) => {
@@ -57,10 +58,12 @@ function App() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteOrder = (id: string) => {
+  const handleDeleteOrder = async (id: string) => {
     if (confirm('¿Está seguro de eliminar este pedido?')) {
-      const updatedList = deleteOrder(id);
+      setIsLoading(true);
+      const updatedList = await deleteOrder(id);
       setOrders(updatedList);
+      setIsLoading(false);
     }
   };
 
@@ -69,6 +72,13 @@ function App() {
     setIsFormOpen(true);
   };
 
+  // 4. CONDITIONAL RENDERING (LOGIN CHECK)
+  // This must happen AFTER all hooks are declared
+  if (!activeUser) {
+    return <Login onLogin={setActiveUser} />;
+  }
+
+  // 5. MAIN APP RENDER
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800">
       
@@ -81,7 +91,7 @@ function App() {
             </div>
             <div>
                 <h1 className="text-xl font-bold tracking-tight">NexusOrder</h1>
-                <p className="text-xs text-slate-500">v1.3.0 (Prod)</p>
+                <p className="text-xs text-slate-500">v1.4 Cloud</p>
             </div>
           </div>
         </div>
@@ -120,11 +130,11 @@ function App() {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-xs border-2 border-slate-600">
-                        {activeUser?.initials || 'G'}
+                        {activeUser?.initials || 'U'}
                     </div>
                     <div className="overflow-hidden">
-                        <p className="text-sm font-medium truncate w-32">{activeUser?.name || 'Invitado'}</p>
-                        <p className="text-xs text-slate-500 truncate w-32">{activeUser?.role || 'Lector'}</p>
+                        <p className="text-sm font-medium truncate w-32">{activeUser?.name}</p>
+                        <p className="text-xs text-slate-500 truncate w-32">{activeUser?.role}</p>
                     </div>
                 </div>
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
@@ -134,24 +144,11 @@ function App() {
           {/* User Select Dropdown */}
           {isUserMenuOpen && (
               <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-lg shadow-xl py-1 overflow-hidden z-20 border border-gray-200">
-                  <p className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Cambiar Usuario</p>
-                  {users.map(u => (
-                      <button 
-                        key={u.id}
-                        onClick={() => { setActiveUser(u); setIsUserMenuOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 ${activeUser?.id === u.id ? 'text-blue-600 font-medium bg-blue-50' : 'text-gray-700'}`}
-                      >
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-600">
-                              {u.initials}
-                          </div>
-                          {u.name}
-                      </button>
-                  ))}
                   <button 
-                    onClick={() => { setCurrentView('settings'); setIsUserMenuOpen(false); }}
-                    className="w-full text-left px-4 py-2 text-xs text-blue-600 hover:bg-blue-50 border-t border-gray-100 flex items-center gap-2"
+                    onClick={() => { setActiveUser(null); setIsUserMenuOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium"
                   >
-                      <Plus size={12} /> Gestionar Usuarios
+                      <LogOut size={14} /> Cerrar Sesión
                   </button>
               </div>
           )}
@@ -159,7 +156,7 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto relative">
         
         {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm">
@@ -168,15 +165,7 @@ function App() {
             <h1 className="text-lg font-bold text-gray-900">NexusOrder</h1>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setCurrentView('dashboard')} className={`p-2 rounded-md ${currentView === 'dashboard' ? 'bg-blue-100 text-blue-600' : 'text-gray-500'}`}>
-              <LayoutDashboard size={24} />
-            </button>
-            <button onClick={() => setCurrentView('orders')} className={`p-2 rounded-md ${currentView === 'orders' ? 'bg-blue-100 text-blue-600' : 'text-gray-500'}`}>
-              <List size={24} />
-            </button>
-            <button onClick={() => setCurrentView('settings')} className={`p-2 rounded-md ${currentView === 'settings' ? 'bg-blue-100 text-blue-600' : 'text-gray-500'}`}>
-              <SettingsIcon size={24} />
-            </button>
+             <button onClick={() => setActiveUser(null)} className="text-gray-500 p-2"><LogOut size={20}/></button>
           </div>
         </div>
 
@@ -197,7 +186,8 @@ function App() {
           {currentView === 'orders' && canEdit && (
             <button 
                 onClick={openNewOrder}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md transition-all hover:shadow-lg transform hover:-translate-y-0.5"
+                disabled={isLoading}
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md transition-all hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50"
             >
                 <Plus size={20} />
                 <span>Nuevo Pedido</span>
@@ -206,7 +196,7 @@ function App() {
         </div>
 
         {/* View Content */}
-        <div className="animate-fade-in">
+        <div className={`animate-fade-in ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
           {currentView === 'dashboard' && <Dashboard orders={orders} />}
           {currentView === 'orders' && (
             <OrderList 
@@ -218,6 +208,15 @@ function App() {
           )}
           {currentView === 'settings' && <Settings currentUser={activeUser} />}
         </div>
+        
+        {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                 <div className="bg-black/20 p-4 rounded-full backdrop-blur-sm">
+                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                 </div>
+            </div>
+        )}
+
       </main>
 
       {/* Modal */}

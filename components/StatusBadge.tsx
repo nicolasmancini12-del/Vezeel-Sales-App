@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { getWorkflow } from '../services/storageService';
 import { WorkflowStatus } from '../types';
@@ -11,7 +10,9 @@ const StatusBadge: React.FC<Props> = ({ status }) => {
   const [workflow, setWorkflow] = useState<WorkflowStatus[]>([]);
 
   useEffect(() => {
-    setWorkflow(getWorkflow());
+    (async () => {
+        setWorkflow(await getWorkflow());
+    })();
   }, []);
 
   // Find the color in the workflow configuration

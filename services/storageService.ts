@@ -1,155 +1,302 @@
-
+import { supabase } from '../supabaseClient';
 import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem } from '../types';
 import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE, MOCK_SERVICES } from '../constants';
 
-const KEYS = {
-  ORDERS: 'nexus_orders_v2',
-  CLIENTS: 'nexus_clients_v1',
-  CONTRACTORS: 'nexus_contractors_v2', 
-  PRICES: 'nexus_prices_v1',
-  COMPANIES: 'nexus_companies_v1',
-  USERS: 'nexus_users_v1',
-  WORKFLOW: 'nexus_workflow_v1',
-  UNITS: 'nexus_units_v1',
-  SERVICES: 'nexus_services_catalog_v1'
-};
+// --- DB INITIALIZATION (SEEDING) ---
+export const initDatabase = async () => {
+    // Check if users exist, if not, seed everything
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    
+    if (count === 0) {
+        console.log("Seeding Database...");
+        await supabase.from('companies').insert(MOCK_COMPANIES);
+        await supabase.from('users').insert(MOCK_USERS);
+        await supabase.from('clients').insert(MOCK_CLIENTS);
+        await supabase.from('contractors').insert(MOCK_CONTRACTORS.map(c => ({...c, company: c.company || ''})));
+        await supabase.from('workflow_statuses').insert(DEFAULT_WORKFLOW);
+        await supabase.from('service_catalog').insert(MOCK_SERVICES);
+        
+        // Seed Units
+        const seedUnits = UNITS_OF_MEASURE.map(u => ({ id: Math.random().toString(36).substr(2, 9), name: u }));
+        await supabase.from('units_of_measure').insert(seedUnits);
 
-// Helper for generic CRUD
-const getList = <T>(key: string, mock: T[]): T[] => {
-  const stored = localStorage.getItem(key);
-  if (!stored) {
-    localStorage.setItem(key, JSON.stringify(mock));
-    return mock;
-  }
-  return JSON.parse(stored);
-};
-
-const saveItem = <T extends { id: string }>(key: string, item: T): T[] => {
-  const list = getList<T>(key, []);
-  const index = list.findIndex(i => i.id === item.id);
-  let newList;
-  if (index >= 0) {
-    newList = [...list];
-    newList[index] = item;
-  } else {
-    newList = [item, ...list];
-  }
-  localStorage.setItem(key, JSON.stringify(newList));
-  return newList;
-};
-
-const deleteItem = <T extends { id: string }>(key: string, id: string): T[] => {
-  const list = getList<T>(key, []);
-  const newList = list.filter(i => i.id !== id);
-  localStorage.setItem(key, JSON.stringify(newList));
-  return newList;
-};
-
-// --- Orders ---
-export const getOrders = () => getList<Order>(KEYS.ORDERS, MOCK_ORDERS);
-export const saveOrder = (order: Order) => saveItem(KEYS.ORDERS, order);
-export const deleteOrder = (id: string) => deleteItem<Order>(KEYS.ORDERS, id);
-
-// --- Clients ---
-export const getClients = () => getList<Client>(KEYS.CLIENTS, MOCK_CLIENTS);
-export const saveClient = (client: Client) => saveItem(KEYS.CLIENTS, client);
-export const deleteClient = (id: string) => deleteItem<Client>(KEYS.CLIENTS, id);
-
-// --- Contractors ---
-export const getContractors = () => getList<Contractor>(KEYS.CONTRACTORS, MOCK_CONTRACTORS);
-export const saveContractor = (c: Contractor) => saveItem(KEYS.CONTRACTORS, c);
-export const deleteContractor = (id: string) => deleteItem<Contractor>(KEYS.CONTRACTORS, id);
-
-// --- Companies ---
-export const getCompanies = () => getList<Company>(KEYS.COMPANIES, MOCK_COMPANIES);
-export const saveCompany = (c: Company) => saveItem(KEYS.COMPANIES, c);
-export const deleteCompany = (id: string) => deleteItem<Company>(KEYS.COMPANIES, id);
-
-// --- Price List ---
-export const getPriceList = () => getList<PriceListEntry>(KEYS.PRICES, MOCK_PRICE_LIST);
-export const savePriceListEntry = (entry: PriceListEntry) => saveItem(KEYS.PRICES, entry);
-export const deletePriceListEntry = (id: string) => deleteItem<PriceListEntry>(KEYS.PRICES, id);
-
-// --- Users ---
-export const getUsers = () => getList<User>(KEYS.USERS, MOCK_USERS);
-export const saveUser = (u: User) => saveItem(KEYS.USERS, u);
-export const deleteUser = (id: string) => deleteItem<User>(KEYS.USERS, id);
-
-// --- Workflow ---
-export const getWorkflow = () => getList<WorkflowStatus>(KEYS.WORKFLOW, DEFAULT_WORKFLOW).sort((a,b) => a.order - b.order);
-export const saveWorkflowStatus = (w: WorkflowStatus) => {
-    const list = getWorkflow();
-    const saved = saveItem(KEYS.WORKFLOW, w);
-    return saved.sort((a,b) => a.order - b.order);
-}
-export const deleteWorkflowStatus = (id: string) => deleteItem<WorkflowStatus>(KEYS.WORKFLOW, id);
-
-// --- Units of Measure ---
-export const getUnits = () => {
-    const stored = localStorage.getItem(KEYS.UNITS);
-    if (!stored) {
-        // Seed from constant list for first time
-        const seedData: UnitOfMeasure[] = UNITS_OF_MEASURE.map(u => ({
-            id: Math.random().toString(36).substr(2, 9),
-            name: u
+        // Seed Prices (Flatten object for DB)
+        const seedPrices = MOCK_PRICE_LIST.map(p => ({
+            id: p.id,
+            service_name: p.serviceName,
+            company: p.company,
+            contractor_id: p.contractorId,
+            client_id: p.clientId,
+            unit_of_measure: p.unitOfMeasure,
+            unit_price: p.unitPrice,
+            contractor_cost: p.contractorCost,
+            valid_from: p.validFrom,
+            valid_to: p.validTo
         }));
-        localStorage.setItem(KEYS.UNITS, JSON.stringify(seedData));
-        return seedData;
+        await supabase.from('price_list').insert(seedPrices);
+
+        // Seed Orders
+        const seedOrders = MOCK_ORDERS.map(o => ({
+             id: o.id,
+             date: o.date,
+             company: o.company,
+             client_id: o.clientId,
+             client_name: o.clientName,
+             po_number: o.poNumber,
+             service_name: o.serviceName,
+             service_details: o.serviceDetails,
+             unit_of_measure: o.unitOfMeasure,
+             quantity: o.quantity,
+             unit_price: o.unitPrice,
+             unit_cost: o.unitCost,
+             total_value: o.totalValue,
+             contractor_id: o.contractorId,
+             contractor_name: o.contractorName,
+             status: o.status,
+             operations_rep: o.operationsRep,
+             observations: o.observations,
+             commitment_date: o.commitmentDate,
+             client_cert_date: o.clientCertDate,
+             billing_date: o.billingDate,
+             history: o.history,
+             attachments: o.attachments
+        }));
+        await supabase.from('orders').insert(seedOrders);
     }
-    return JSON.parse(stored) as UnitOfMeasure[];
 };
-export const saveUnit = (u: UnitOfMeasure) => saveItem(KEYS.UNITS, u);
-export const deleteUnit = (id: string) => deleteItem<UnitOfMeasure>(KEYS.UNITS, id);
-
-// --- Service Catalog (New) ---
-export const getServices = () => getList<ServiceCatalogItem>(KEYS.SERVICES, MOCK_SERVICES);
-export const saveService = (s: ServiceCatalogItem) => saveItem(KEYS.SERVICES, s);
-export const deleteService = (id: string) => deleteItem<ServiceCatalogItem>(KEYS.SERVICES, id);
 
 
-// --- BACKUP SYSTEM ---
+// --- ORDERS ---
+export const getOrders = async (): Promise<Order[]> => {
+    const { data, error } = await supabase.from('orders').select('*');
+    if (error) throw error;
+    
+    return data.map((d: any) => ({
+        ...d,
+        clientId: d.client_id,
+        clientName: d.client_name,
+        poNumber: d.po_number,
+        serviceName: d.service_name,
+        serviceDetails: d.service_details,
+        unitOfMeasure: d.unit_of_measure,
+        unitPrice: d.unit_price,
+        unitCost: d.unit_cost,
+        totalValue: d.total_value,
+        contractorId: d.contractor_id,
+        contractorName: d.contractor_name,
+        operationsRep: d.operations_rep,
+        commitmentDate: d.commitment_date,
+        clientCertDate: d.client_cert_date,
+        billingDate: d.billing_date
+    }));
+};
 
-export const exportBackup = () => {
+export const saveOrder = async (order: Order): Promise<Order[]> => {
+    // Transform to DB Format
+    const dbOrder = {
+             id: order.id,
+             date: order.date,
+             company: order.company,
+             client_id: order.clientId,
+             client_name: order.clientName,
+             po_number: order.poNumber,
+             service_name: order.serviceName,
+             service_details: order.serviceDetails,
+             unit_of_measure: order.unitOfMeasure,
+             quantity: order.quantity,
+             unit_price: order.unitPrice,
+             unit_cost: order.unitCost,
+             total_value: order.totalValue,
+             contractor_id: order.contractorId,
+             contractor_name: order.contractorName,
+             status: order.status,
+             operations_rep: order.operationsRep,
+             observations: order.observations,
+             commitment_date: order.commitmentDate,
+             client_cert_date: order.clientCertDate,
+             billing_date: order.billingDate,
+             history: order.history,
+             attachments: order.attachments
+    };
+
+    const { error } = await supabase.from('orders').upsert(dbOrder);
+    if (error) throw error;
+    return getOrders();
+};
+
+export const deleteOrder = async (id: string): Promise<Order[]> => {
+    const { error } = await supabase.from('orders').delete().eq('id', id);
+    if (error) throw error;
+    return getOrders();
+};
+
+
+// --- CLIENTS ---
+export const getClients = async (): Promise<Client[]> => {
+    const { data, error } = await supabase.from('clients').select('*');
+    if (error) throw error;
+    return data.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        taxId: d.tax_id,
+        contactName: d.contact_name
+    }));
+};
+export const saveClient = async (item: Client) => {
+    const { error } = await supabase.from('clients').upsert({
+        id: item.id,
+        name: item.name,
+        tax_id: item.taxId,
+        contact_name: item.contactName
+    });
+    if(error) throw error;
+    return getClients();
+};
+export const deleteClient = async (id: string) => {
+    await supabase.from('clients').delete().eq('id', id);
+    return getClients();
+};
+
+// --- CONTRACTORS ---
+export const getContractors = async (): Promise<Contractor[]> => {
+    const { data } = await supabase.from('contractors').select('*');
+    return data || [];
+};
+export const saveContractor = async (item: Contractor) => {
+    await supabase.from('contractors').upsert(item);
+    return getContractors();
+};
+export const deleteContractor = async (id: string) => {
+    await supabase.from('contractors').delete().eq('id', id);
+    return getContractors();
+};
+
+// --- COMPANIES ---
+export const getCompanies = async (): Promise<Company[]> => {
+    const { data } = await supabase.from('companies').select('*');
+    return data || [];
+};
+export const saveCompany = async (item: Company) => {
+    await supabase.from('companies').upsert(item);
+    return getCompanies();
+};
+export const deleteCompany = async (id: string) => {
+    await supabase.from('companies').delete().eq('id', id);
+    return getCompanies();
+};
+
+// --- USERS ---
+export const getUsers = async (): Promise<User[]> => {
+    const { data } = await supabase.from('users').select('*');
+    return data || [];
+};
+export const saveUser = async (item: User) => {
+    await supabase.from('users').upsert(item);
+    return getUsers();
+};
+export const deleteUser = async (id: string) => {
+    await supabase.from('users').delete().eq('id', id);
+    return getUsers();
+};
+
+// --- WORKFLOW ---
+export const getWorkflow = async (): Promise<WorkflowStatus[]> => {
+    const { data } = await supabase.from('workflow_statuses').select('*').order('order', {ascending: true});
+    return data || [];
+};
+export const saveWorkflowStatus = async (item: WorkflowStatus) => {
+    await supabase.from('workflow_statuses').upsert(item);
+    return getWorkflow();
+};
+export const deleteWorkflowStatus = async (id: string) => {
+    await supabase.from('workflow_statuses').delete().eq('id', id);
+    return getWorkflow();
+};
+
+// --- UNITS ---
+export const getUnits = async (): Promise<UnitOfMeasure[]> => {
+    const { data } = await supabase.from('units_of_measure').select('*');
+    return data || [];
+};
+export const saveUnit = async (item: UnitOfMeasure) => {
+    await supabase.from('units_of_measure').upsert(item);
+    return getUnits();
+};
+export const deleteUnit = async (id: string) => {
+    await supabase.from('units_of_measure').delete().eq('id', id);
+    return getUnits();
+};
+
+// --- SERVICES ---
+export const getServices = async (): Promise<ServiceCatalogItem[]> => {
+    const { data } = await supabase.from('service_catalog').select('*');
+    return data || [];
+};
+export const saveService = async (item: ServiceCatalogItem) => {
+    await supabase.from('service_catalog').upsert(item);
+    return getServices();
+};
+export const deleteService = async (id: string) => {
+    await supabase.from('service_catalog').delete().eq('id', id);
+    return getServices();
+};
+
+// --- PRICE LIST ---
+export const getPriceList = async (): Promise<PriceListEntry[]> => {
+    const { data } = await supabase.from('price_list').select('*');
+    return (data || []).map((d: any) => ({
+        id: d.id,
+        serviceName: d.service_name,
+        company: d.company,
+        contractorId: d.contractor_id,
+        clientId: d.client_id,
+        unitOfMeasure: d.unit_of_measure,
+        unitPrice: d.unit_price,
+        contractorCost: d.contractor_cost,
+        validFrom: d.valid_from,
+        validTo: d.valid_to
+    }));
+};
+export const savePriceListEntry = async (entry: PriceListEntry) => {
+    const dbEntry = {
+        id: entry.id,
+        service_name: entry.serviceName,
+        company: entry.company,
+        contractor_id: entry.contractorId,
+        client_id: entry.clientId,
+        unit_of_measure: entry.unitOfMeasure,
+        unit_price: entry.unitPrice,
+        contractor_cost: entry.contractorCost,
+        valid_from: entry.validFrom,
+        valid_to: entry.validTo
+    };
+    await supabase.from('price_list').upsert(dbEntry);
+    return getPriceList();
+};
+export const deletePriceListEntry = async (id: string) => {
+    await supabase.from('price_list').delete().eq('id', id);
+    return getPriceList();
+};
+
+// --- BACKUP ---
+export const exportBackup = async () => {
+    // Fetch all fresh
+    const [o, c, ct, co, p, u, w, un, s] = await Promise.all([
+        getOrders(), getClients(), getContractors(), getCompanies(),
+        getPriceList(), getUsers(), getWorkflow(), getUnits(), getServices()
+    ]);
+    
     const backupData = {
-        orders: getOrders(),
-        clients: getClients(),
-        contractors: getContractors(),
-        companies: getCompanies(),
-        prices: getPriceList(),
-        users: getUsers(),
-        workflow: getWorkflow(),
-        units: getUnits(),
-        services: getServices(),
+        orders: o, clients: c, contractors: ct, companies: co, prices: p,
+        users: u, workflow: w, units: un, services: s,
         timestamp: new Date().toISOString(),
-        version: '1.2'
+        version: '1.4-cloud'
     };
     return JSON.stringify(backupData, null, 2);
 };
 
-export const importBackup = (jsonString: string): boolean => {
-    try {
-        const data = JSON.parse(jsonString);
-        
-        // Validate basic structure
-        if (!data.orders || !data.clients || !data.companies) {
-            console.error("Invalid backup file format");
-            return false;
-        }
-
-        // Save everything
-        localStorage.setItem(KEYS.ORDERS, JSON.stringify(data.orders));
-        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(data.clients));
-        localStorage.setItem(KEYS.CONTRACTORS, JSON.stringify(data.contractors));
-        localStorage.setItem(KEYS.COMPANIES, JSON.stringify(data.companies));
-        localStorage.setItem(KEYS.PRICES, JSON.stringify(data.prices));
-        localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
-        localStorage.setItem(KEYS.WORKFLOW, JSON.stringify(data.workflow));
-        if (data.units) localStorage.setItem(KEYS.UNITS, JSON.stringify(data.units));
-        if (data.services) localStorage.setItem(KEYS.SERVICES, JSON.stringify(data.services));
-
-        return true;
-    } catch (e) {
-        console.error("Error importing backup", e);
-        return false;
-    }
+// Import logic would require clearing tables and inserting, complex for this scope but can be done
+export const importBackup = (json: string): boolean => {
+    console.log("Import not fully implemented for Cloud version yet due to foreign key constraints.");
+    return false;
 };
