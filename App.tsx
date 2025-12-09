@@ -91,7 +91,7 @@ function App() {
             </div>
             <div>
                 <h1 className="text-xl font-bold tracking-tight">NexusOrder</h1>
-                <p className="text-xs text-slate-500">v1.4 Cloud</p>
+                <p className="text-xs text-slate-500">v1.6 Cloud</p>
             </div>
           </div>
         </div>
