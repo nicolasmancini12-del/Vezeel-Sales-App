@@ -255,7 +255,14 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                 onClick={() => requestSort('clientName')}
                 scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
               >
-                <div className="flex items-center">Cliente / Servicio {getSortIcon('clientName')}</div>
+                <div className="flex items-center">Cliente {getSortIcon('clientName')}</div>
+              </th>
+
+              <th 
+                onClick={() => requestSort('serviceName')}
+                scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+              >
+                <div className="flex items-center">Servicio {getSortIcon('serviceName')}</div>
               </th>
 
               <th 
@@ -292,7 +299,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredAndSortedOrders.length === 0 ? (
                 <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-gray-500 text-sm">
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500 text-sm">
                         No se encontraron pedidos con los filtros actuales.
                     </td>
                 </tr>
@@ -324,10 +331,15 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                   )}
                 </td>
 
-                {/* 2. Cliente / Servicio */}
+                {/* 2. Cliente */}
                 <td className="px-6 py-4">
                   <div className="text-sm font-bold text-gray-900">{order.clientName}</div>
-                  <div className="text-sm text-gray-600 truncate max-w-[200px]" title={order.serviceName}>{order.serviceName}</div>
+                </td>
+
+                {/* 3. Servicio (y detalles asociados) */}
+                <td className="px-6 py-4">
+                  <div className="text-sm font-medium text-gray-900">{order.serviceName}</div>
+                  <div className="text-xs text-gray-500 truncate max-w-[200px]" title={order.serviceDetails}>{order.serviceDetails}</div>
                   {order.poNumber && <div className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-1">OC: {order.poNumber}</div>}
                   {order.commitmentDate && (
                       <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1" title="Fecha Compromiso">
@@ -336,7 +348,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                   )}
                 </td>
 
-                {/* 3. Contratista (New Column) */}
+                {/* 4. Contratista */}
                 <td className="px-6 py-4 whitespace-nowrap">
                     {order.contractorName ? (
                         <div className="flex flex-col">
@@ -348,7 +360,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                     )}
                 </td>
 
-                {/* 4. Avance (New Column) */}
+                {/* 5. Avance */}
                 <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1 w-24">
                         <div className="flex justify-between text-[10px] text-gray-500 font-medium">
@@ -365,18 +377,18 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
                     </div>
                 </td>
 
-                {/* 5. Económico (Cleaned) */}
+                {/* 6. Económico */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-bold text-gray-900">${order.totalValue.toLocaleString()}</div>
                   <div className="text-xs text-gray-500">${order.unitPrice} / u</div>
                 </td>
 
-                {/* 6. Estado */}
+                {/* 7. Estado */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={order.status} />
                 </td>
 
-                {/* 7. Actions */}
+                {/* 8. Actions */}
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   {canEdit && (
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
