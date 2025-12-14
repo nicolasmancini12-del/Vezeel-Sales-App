@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Order, Company, User, WorkflowStatus } from '../types';
 import StatusBadge from './StatusBadge';
-import { Edit2, Trash2, Search, Download, Paperclip, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, CalendarClock } from 'lucide-react';
+import { Edit2, Trash2, Search, Download, Paperclip, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, CalendarClock, Filter, Check, ChevronDown, X } from 'lucide-react';
 import { getCompanies, getWorkflow } from '../services/storageService';
 import { ROLES } from '../constants';
 import * as XLSX from 'xlsx';
@@ -20,10 +20,104 @@ interface SortConfig {
   direction: SortDirection;
 }
 
+// Internal Helper Component for Multi-Select
+const MultiSelectDropdown = ({ 
+    label, 
+    options, 
+    selected, 
+    onChange 
+}: { 
+    label: string, 
+    options: { value: string, label: string, color?: string }[], 
+    selected: string[], 
+    onChange: (values: string[]) => void 
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const toggleOption = (value: string) => {
+        if (selected.includes(value)) {
+            onChange(selected.filter(s => s !== value));
+        } else {
+            onChange([...selected, value]);
+        }
+    };
+
+    const clearSelection = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onChange([]);
+    };
+
+    const displayText = selected.length === 0 
+        ? `Todos: ${label}` 
+        : selected.length === 1 
+            ? options.find(o => o.value === selected[0])?.label 
+            : `${selected.length} seleccionados`;
+
+    return (
+        <div className="relative inline-block text-left min-w-[180px]" ref={containerRef}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                    selected.length > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-300'
+                }`}
+            >
+                <span className="truncate max-w-[140px]">{displayText}</span>
+                <div className="flex items-center">
+                    {selected.length > 0 && (
+                        <span onClick={clearSelection} className="mr-1 p-0.5 hover:bg-blue-200 rounded-full cursor-pointer">
+                            <X size={12} />
+                        </span>
+                    )}
+                    <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-20 mt-1 w-full min-w-[220px] bg-white shadow-lg rounded-lg border border-gray-100 py-1 animate-fade-in max-h-64 overflow-y-auto custom-scrollbar">
+                    {options.map((opt) => {
+                         const isSelected = selected.includes(opt.value);
+                         return (
+                            <div 
+                                key={opt.value}
+                                onClick={() => toggleOption(opt.value)}
+                                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                            >
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
+                                    {isSelected && <Check size={10} className="text-white" />}
+                                </div>
+                                <span className={`text-sm ${isSelected ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
+                                    {opt.label}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [companyFilter, setCompanyFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Changed filters to Arrays for Multi-select
+  const [companyFilters, setCompanyFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  
   const [companies, setCompanies] = useState<Company[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowStatus[]>([]);
   
@@ -67,8 +161,9 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
         order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.contractorName || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesCompany = companyFilter === 'all' || order.company === companyFilter;
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      // Multi-select Logic: If array is empty, match all. Else, check inclusion.
+      const matchesCompany = companyFilters.length === 0 || companyFilters.includes(order.company);
+      const matchesStatus = statusFilters.length === 0 || statusFilters.includes(order.status);
 
       return matchesSearch && matchesCompany && matchesStatus;
     });
@@ -112,7 +207,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
     }
 
     return result;
-  }, [orders, searchTerm, companyFilter, statusFilter, sortConfig]);
+  }, [orders, searchTerm, companyFilters, statusFilters, sortConfig]);
 
   const handleExportExcel = () => {
     // Sheet 1: Orders (General)
@@ -191,7 +286,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
       {/* Filters Toolbar */}
-      <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row gap-4 items-center justify-between bg-white">
+      <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row gap-4 items-center justify-between bg-white z-20">
         
         <div className="relative w-full md:w-80">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -207,31 +302,24 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
         </div>
 
         <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 items-center">
-          <div className="relative inline-block text-left min-w-[150px]">
-             <select 
-               value={companyFilter} 
-               onChange={(e) => setCompanyFilter(e.target.value)}
-               className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg"
-             >
-               <option value="all">Todas las Empresas</option>
-               {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-             </select>
-          </div>
+          
+          <MultiSelectDropdown 
+              label="Empresas" 
+              options={companies.map(c => ({ value: c.name, label: c.name }))}
+              selected={companyFilters}
+              onChange={setCompanyFilters}
+          />
 
-          <div className="relative inline-block text-left min-w-[150px]">
-             <select 
-               value={statusFilter} 
-               onChange={(e) => setStatusFilter(e.target.value)}
-               className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg"
-             >
-               <option value="all">Todos los Estados</option>
-               {workflow.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-             </select>
-          </div>
+          <MultiSelectDropdown 
+              label="Estados" 
+              options={workflow.map(s => ({ value: s.name, label: s.name }))}
+              selected={statusFilters}
+              onChange={setStatusFilters}
+          />
 
           <button 
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors shadow-sm ml-2"
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition-colors shadow-sm ml-2 whitespace-nowrap"
           >
               <Download size={16} />
               <span className="hidden md:inline">Excel</span>
@@ -240,7 +328,7 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto flex-1 custom-scrollbar">
+      <div className="overflow-x-auto flex-1 custom-scrollbar z-0">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
             <tr>
