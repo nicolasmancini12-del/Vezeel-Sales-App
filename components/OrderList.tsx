@@ -86,7 +86,7 @@ const MultiSelectDropdown = ({
             </button>
 
             {isOpen && (
-                <div className="absolute z-20 mt-1 w-full min-w-[220px] bg-white shadow-lg rounded-lg border border-gray-100 py-1 animate-fade-in max-h-64 overflow-y-auto custom-scrollbar">
+                <div className="absolute z-50 mt-1 w-full min-w-[220px] bg-white shadow-xl rounded-lg border border-gray-200 py-1 animate-fade-in max-h-64 overflow-y-auto custom-scrollbar left-0">
                     {options.map((opt) => {
                          const isSelected = selected.includes(opt.value);
                          return (
@@ -104,6 +104,9 @@ const MultiSelectDropdown = ({
                             </div>
                         );
                     })}
+                    {options.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-gray-400 italic">No hay opciones disponibles</div>
+                    )}
                 </div>
             )}
         </div>
@@ -301,7 +304,12 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
           />
         </div>
 
-        <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 items-center">
+        {/* 
+            CRITICAL FIX: 
+            Removed 'overflow-x-auto' which clipped dropdowns. 
+            Added 'flex-wrap' for responsiveness. 
+        */}
+        <div className="flex flex-wrap gap-3 w-full md:w-auto items-center justify-end">
           
           <MultiSelectDropdown 
               label="Empresas" 
