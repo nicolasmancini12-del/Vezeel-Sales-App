@@ -1,18 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, List, Plus, Layers, Settings as SettingsIcon, ChevronDown, User as UserIcon, LogOut, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, List, Plus, Layers, Settings as SettingsIcon, ChevronDown, User as UserIcon, LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import OrderList from './components/OrderList';
 import OrderForm from './components/OrderForm';
 import Settings from './components/Settings';
 import Login from './components/Login';
-import BudgetModule from './components/BudgetModule';
 import { getOrders, saveOrder, deleteOrder } from './services/storageService';
 import { Order, User } from './types';
 import { ROLES } from './constants';
 
 function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'orders' | 'budget' | 'settings'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'orders' | 'settings'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -69,16 +68,6 @@ function App() {
     setIsFormOpen(true);
   };
 
-  const renderView = () => {
-    switch (currentView) {
-      case 'dashboard': return <Dashboard orders={orders} />;
-      case 'orders': return <OrderList orders={orders} onEdit={handleEditOrder} onDelete={handleDeleteOrder} currentUser={activeUser} />;
-      case 'budget': return <BudgetModule />;
-      case 'settings': return <Settings currentUser={activeUser} />;
-      default: return <Dashboard orders={orders} />;
-    }
-  };
-
   if (!activeUser) return <Login onLogin={setActiveUser} />;
 
   return (
@@ -88,15 +77,14 @@ function App() {
           <div className="flex items-center gap-3">
             <div className="bg-blue-600 p-2 rounded-lg"><Layers className="text-white h-6 w-6" /></div>
             <div>
-                <h1 className="text-xl font-bold tracking-tight">NexusERP</h1>
-                <p className="text-xs text-slate-500">Unificado</p>
+                <h1 className="text-xl font-bold tracking-tight">Nexus ERP</h1>
+                <p className="text-xs text-slate-500">Sales App</p>
             </div>
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <button onClick={() => setCurrentView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20} /> <span className="font-medium">Dashboard</span></button>
           <button onClick={() => setCurrentView('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><List size={20} /> <span className="font-medium">Pedidos</span></button>
-          <button onClick={() => setCurrentView('budget')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'budget' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><TrendingUp size={20} /> <span className="font-medium">Presupuesto</span></button>
           <button onClick={() => setCurrentView('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'settings' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><SettingsIcon size={20} /> <span className="font-medium">Configuración</span></button>
         </nav>
         <div className="p-4 border-t border-slate-800 relative">
@@ -121,7 +109,6 @@ function App() {
           <h2 className="text-2xl font-bold text-gray-900">
             {currentView === 'dashboard' && 'Panel General'}
             {currentView === 'orders' && 'Gestión de Pedidos'}
-            {currentView === 'budget' && 'Planificación Presupuestaria'}
             {currentView === 'settings' && 'Maestros y Configuración'}
           </h2>
           {currentView === 'orders' && canEdit && (
@@ -130,7 +117,11 @@ function App() {
             </button>
           )}
         </div>
-        <div className={`pb-10 h-full flex flex-col ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>{renderView()}</div>
+        <div className={`pb-10 h-full flex flex-col ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+           {currentView === 'dashboard' && <Dashboard orders={orders} />}
+           {currentView === 'orders' && <OrderList orders={orders} onEdit={handleEditOrder} onDelete={handleDeleteOrder} currentUser={activeUser} />}
+           {currentView === 'settings' && <Settings currentUser={activeUser} />}
+        </div>
         {isLoading && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"><div className="bg-black/20 p-4 rounded-full backdrop-blur-sm"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div></div></div>}
       </main>
       <OrderForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSubmit={handleCreateOrder} initialData={editingOrder} currentUser={activeUser} />

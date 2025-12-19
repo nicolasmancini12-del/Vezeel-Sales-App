@@ -1,6 +1,4 @@
 
-// --- CORE TYPES ---
-
 export interface WorkflowStatus {
   id: string;
   name: string;
@@ -27,40 +25,10 @@ export interface ServiceCatalogItem {
 export interface User {
   id: string;
   name: string;
-  role: string; // 'Admin', 'Operaciones', 'Comercial', 'Lector'
+  role: string; // 'Admin', 'Operaciones', 'Lector'
   initials: string;
   accessCode?: string;
 }
-
-// --- COMMERCIAL / BUDGET MODULE (UPDATED) ---
-
-export interface ExchangeRate {
-    id: string;
-    year: number;
-    month: number; // 0-11
-    rate: number;
-}
-
-export interface BudgetCategory {
-    id: string;
-    name: string;
-    // Expanded types for better P&L structure
-    type: 'Ingreso' | 'Costo Directo' | 'Costo Indirecto'; 
-    orderIndex: number;
-    assignedCompanyIds?: string[]; // New: Link specific companies
-}
-
-export interface BudgetEntry {
-    id: string;
-    companyId: string;
-    categoryId: string;
-    monthDate: string; // YYYY-MM-DD (Siempre dia 01)
-    quantity: number;  // New: Input base
-    unitValue: number; // New: Input base
-    amount: number;    // Calculated (Qty * UnitValue)
-}
-
-// --- OPERATIONAL MODULE ---
 
 export interface Client {
   id: string;
@@ -113,49 +81,57 @@ export interface ProgressLogEntry {
     user: string;
 }
 
+// Budgeting related interfaces
+export interface BudgetCategory {
+  id: string;
+  name: string;
+  type: 'Ingreso' | 'Costo Directo' | 'Costo Indirecto';
+  assignedCompanyIds?: string[];
+}
+
+export interface BudgetEntry {
+  id: string;
+  companyId: string;
+  categoryId: string;
+  monthDate: string; // ISO Date YYYY-MM-01
+  quantity: number;
+  unitValue: number;
+  amount: number;
+}
+
+export interface ExchangeRate {
+  id: string;
+  year: number;
+  month: number;
+  rate: number;
+}
+
 export interface Order {
   id: string;
   date: string;
-  company: string; // Selling Company
-  
-  // Link al Presupuesto
-  budgetCategoryId: string; 
-
+  company: string; 
   clientId: string; 
   clientName: string; 
   poNumber: string; 
-  
+  budgetCategoryId?: string; // Support for Budget Module integration
   serviceName: string;
   serviceDetails?: string; 
-  
   unitOfMeasure: string; 
   quantity: number;
   unitPrice: number;
   unitCost?: number; 
-  
-  totalValue: number; // Calculated in UI/DB
-  
+  totalValue: number;
   contractorId?: string; 
   contractorName?: string; 
-  
   status: string; 
   operationsRep: string; 
   observations: string;
-  
   commitmentDate?: string; 
   clientCertDate?: string; 
   billingDate?: string;    
-
   history?: OrderHistoryEntry[];
   attachments?: Attachment[];
   progressLogs?: ProgressLogEntry[];
 }
 
 export type OrderFormData = Omit<Order, 'id' | 'totalValue' | 'clientName' | 'contractorName' | 'history' | 'attachments' | 'progressLogs'>;
-
-export interface DashboardStats {
-  totalRevenue: number;
-  totalOrders: number;
-  ordersByStatus: { name: string; value: number; color: string }[];
-  revenueByCompany: { name: string; value: number }[];
-}
