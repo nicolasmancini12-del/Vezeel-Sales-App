@@ -42,11 +42,17 @@ function App() {
 
   const handleCreateOrder = async (order: Order) => {
     setIsLoading(true);
-    const updatedList = await saveOrder(order);
-    setOrders(updatedList);
-    setIsFormOpen(false);
-    setEditingOrder(null);
-    setIsLoading(false);
+    try {
+        const updatedList = await saveOrder(order);
+        setOrders(updatedList);
+        setIsFormOpen(false);
+        setEditingOrder(null);
+    } catch (error: any) {
+        console.error("Save failed:", error);
+        alert(`No se pudo guardar el pedido: ${error.message || 'Error desconocido en la base de datos'}. Verifique si la tabla tiene todas las columnas necesarias.`);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleEditOrder = (order: Order) => {
@@ -57,9 +63,14 @@ function App() {
   const handleDeleteOrder = async (id: string) => {
     if (confirm('¿Está seguro de eliminar este pedido?')) {
       setIsLoading(true);
-      const updatedList = await deleteOrder(id);
-      setOrders(updatedList);
-      setIsLoading(false);
+      try {
+        const updatedList = await deleteOrder(id);
+        setOrders(updatedList);
+      } catch (error: any) {
+        alert("Error al eliminar: " + error.message);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -72,7 +83,6 @@ function App() {
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800">
-      {/* Sidebar Nexus Order */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10 hidden md:flex">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">

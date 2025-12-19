@@ -1,9 +1,7 @@
-
 import { supabase } from '../supabaseClient';
 import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem, BudgetCategory, BudgetEntry, ExchangeRate } from '../types';
 import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE, MOCK_SERVICES } from '../constants';
 
-// Retry logic for Supabase queries to handle intermittent connection issues
 const queryWithRetry = async <T>(queryBuilder: any, retries = 3, delay = 1000): Promise<{ data: T | null, error: any }> => {
     for (let i = 0; i < retries; i++) {
         const { data, error } = await queryBuilder;
@@ -17,7 +15,6 @@ const queryWithRetry = async <T>(queryBuilder: any, retries = 3, delay = 1000): 
     return { data: null, error: { message: "Retries exhausted." } };
 };
 
-// Database seeding logic for initial setup
 export const initDatabase = async () => {
     const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
     if (count === 0) {
@@ -44,15 +41,18 @@ export const initDatabase = async () => {
     }
 };
 
-// Fetch all orders with mapping to local interface
 export const getOrders = async (): Promise<Order[]> => {
     const { data, error } = await queryWithRetry<any[]>(supabase.from('orders').select('*').order('date', {ascending: false}));
-    if (error) return [];
+    if (error) {
+        console.error("Error fetching orders:", error);
+        return [];
+    }
     return data.map((d: any) => ({
         ...d,
         clientId: d.client_id,
         clientName: d.client_name,
         poNumber: d.po_number,
+        budgetCategoryId: d.budget_category_id,
         serviceName: d.service_name,
         serviceDetails: d.service_details,
         unitOfMeasure: d.unit_of_measure,
@@ -70,33 +70,51 @@ export const getOrders = async (): Promise<Order[]> => {
     }));
 };
 
-// Upsert order data
 export const saveOrder = async (order: Order): Promise<Order[]> => {
     const dbOrder = {
-             id: order.id, date: order.date, company: order.company,
-             client_id: order.clientId, client_name: order.clientName, po_number: order.poNumber,
-             service_name: order.serviceName, service_details: order.serviceDetails, unit_of_measure: order.unitOfMeasure,
-             quantity: order.quantity, unit_price: order.unitPrice, unit_cost: order.unitCost, total_value: order.totalValue,
-             contractor_id: order.contractorId, contractor_name: order.contractorName, status: order.status,
-             operations_rep: order.operationsRep, observations: order.observations,
-             commitment_date: order.commitmentDate, 
-             production_date: order.productionDate,
-             client_cert_date: order.clientCertDate, 
-             billing_date: order.billingDate,
-             history: order.history, attachments: order.attachments, progress_logs: order.progressLogs
+             id: order.id, 
+             date: order.date, 
+             company: order.company,
+             client_id: order.clientId, 
+             client_name: order.clientName, 
+             po_number: order.poNumber,
+             budget_category_id: order.budgetCategoryId || null,
+             service_name: order.serviceName, 
+             service_details: order.serviceDetails, 
+             unit_of_measure: order.unitOfMeasure,
+             quantity: order.quantity, 
+             unit_price: order.unitPrice, 
+             unit_cost: order.unitCost, 
+             total_value: order.totalValue,
+             contractor_id: order.contractorId, 
+             contractor_name: order.contractorName, 
+             status: order.status,
+             operations_rep: order.operationsRep, 
+             observations: order.observations,
+             commitment_date: order.commitmentDate || null, 
+             production_date: order.productionDate || null,
+             client_cert_date: order.clientCertDate || null, 
+             billing_date: order.billingDate || null,
+             history: order.history || [], 
+             attachments: order.attachments || [], 
+             progress_logs: order.progressLogs || []
     };
+    
+    console.log("Attempting to save order to Supabase:", dbOrder);
+    
     const { error } = await supabase.from('orders').upsert(dbOrder);
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase Save Error:", error);
+        throw error;
+    }
     return getOrders();
 };
 
-// Remove order by ID
 export const deleteOrder = async (id: string): Promise<Order[]> => {
     await supabase.from('orders').delete().eq('id', id);
     return getOrders();
 };
 
-// Master data management functions
 export const getClients = async () => { const { data } = await supabase.from('clients').select('*').order('name'); return (data || []).map(d => ({id: d.id, name: d.name, taxId: d.tax_id, contactName: d.contact_name})); };
 export const saveClient = async (item: Client) => { await supabase.from('clients').upsert({ id: item.id, name: item.name, tax_id: item.taxId, contact_name: item.contactName }); return getClients(); };
 export const deleteClient = async (id: string) => { await supabase.from('clients').delete().eq('id', id); return getClients(); };
@@ -118,11 +136,12 @@ export const deleteUnit = async (id: string) => { await supabase.from('units_of_
 export const getServices = async () => { const { data } = await supabase.from('service_catalog').select('*').order('name'); return data || []; };
 export const saveService = async (item: ServiceCatalogItem) => { await supabase.from('service_catalog').upsert(item); return getServices(); };
 export const deleteService = async (id: string) => { await supabase.from('service_catalog').delete().eq('id', id); return getServices(); };
+
+// Corrected mapping in getPriceList to use validFrom and validTo camelCase properties to match the PriceListEntry interface.
 export const getPriceList = async () => { const { data } = await supabase.from('price_list').select('*'); return (data || []).map(d => ({id: d.id, serviceName: d.service_name, company: d.company, contractorId: d.contractor_id, clientId: d.client_id, unitOfMeasure: d.unit_of_measure, unitPrice: d.unit_price, contractorCost: d.contractor_cost, validFrom: d.valid_from, validTo: d.valid_to})); };
 export const savePriceListEntry = async (entry: PriceListEntry) => { await supabase.from('price_list').upsert({ id: entry.id, service_name: entry.serviceName, company: entry.company, contractor_id: entry.contractorId, client_id: entry.clientId, unit_of_measure: entry.unitOfMeasure, unit_price: entry.unitPrice, contractor_cost: entry.contractorCost, valid_from: entry.validFrom, valid_to: entry.validTo }); return getPriceList(); };
 export const deletePriceListEntry = async (id: string) => { await supabase.from('price_list').delete().eq('id', id); return getPriceList(); };
 
-// Budget related storage functions
 export const getBudgetCategories = async (): Promise<BudgetCategory[]> => {
     const { data } = await supabase.from('budget_categories').select('*').order('name');
     if (!data || data.length === 0) {
@@ -134,38 +153,18 @@ export const getBudgetCategories = async (): Promise<BudgetCategory[]> => {
             { id: 'cat5', name: 'Gastos Oficina', type: 'Costo Indirecto' },
         ];
     }
-    return data.map(d => ({
-        id: d.id,
-        name: d.name,
-        type: d.type,
-        assignedCompanyIds: d.assigned_company_ids
-    }));
+    return data.map(d => ({ id: d.id, name: d.name, type: d.type, assignedCompanyIds: d.assigned_company_ids }));
 };
 
 export const getBudgetEntries = async (year: number): Promise<BudgetEntry[]> => {
     const start = `${year}-01-01`;
     const end = `${year}-12-31`;
     const { data } = await supabase.from('budget_entries').select('*').gte('month_date', start).lte('month_date', end);
-    return (data || []).map(d => ({
-        id: d.id,
-        companyId: d.company_id,
-        categoryId: d.category_id,
-        monthDate: d.month_date,
-        quantity: d.quantity,
-        unitValue: d.unit_value,
-        amount: d.amount
-    }));
+    return (data || []).map(d => ({ id: d.id, companyId: d.company_id, categoryId: d.category_id, monthDate: d.month_date, quantity: d.quantity, unitValue: d.unit_value, amount: d.amount }));
 };
 
 export const saveBudgetEntry = async (entry: Partial<BudgetEntry>) => {
-    const dbEntry = {
-        company_id: entry.companyId,
-        category_id: entry.categoryId,
-        month_date: entry.monthDate,
-        quantity: entry.quantity,
-        unit_value: entry.unitValue,
-        amount: entry.amount
-    };
+    const dbEntry = { company_id: entry.companyId, category_id: entry.categoryId, month_date: entry.monthDate, quantity: entry.quantity, unit_value: entry.unitValue, amount: entry.amount };
     const { error } = await supabase.from('budget_entries').upsert(dbEntry, { onConflict: 'company_id,category_id,month_date' });
     if (error) throw error;
 };
@@ -180,7 +179,6 @@ export const saveExchangeRate = async (rate: Partial<ExchangeRate>) => {
     if (error) throw error;
 };
 
-// Backup all system data
 export const exportBackup = async () => {
     const [o, c, ct, co, p, u, w, un, s] = await Promise.all([getOrders(), getClients(), getContractors(), getCompanies(), getPriceList(), getUsers(), getWorkflow(), getUnits(), getServices()]);
     return JSON.stringify({ orders: o, clients: c, contractors: ct, companies: co, prices: p, users: u, workflow: w, units: un, services: s, timestamp: new Date().toISOString(), version: '1.6-sales-app' }, null, 2);
