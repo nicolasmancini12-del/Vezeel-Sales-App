@@ -25,7 +25,7 @@ export interface ServiceCatalogItem {
 export interface User {
   id: string;
   name: string;
-  role: string; // 'Admin', 'Operaciones', 'Lector'
+  role: string; 
   initials: string;
   accessCode?: string;
 }
@@ -81,7 +81,7 @@ export interface ProgressLogEntry {
     user: string;
 }
 
-// Budgeting related interfaces
+// Add Budget related interfaces
 export interface BudgetCategory {
   id: string;
   name: string;
@@ -93,7 +93,7 @@ export interface BudgetEntry {
   id: string;
   companyId: string;
   categoryId: string;
-  monthDate: string; // ISO Date YYYY-MM-01
+  monthDate: string; // ISO format YYYY-MM-01
   quantity: number;
   unitValue: number;
   amount: number;
@@ -113,7 +113,8 @@ export interface Order {
   clientId: string; 
   clientName: string; 
   poNumber: string; 
-  budgetCategoryId?: string; // Support for Budget Module integration
+  // Added budgetCategoryId to match mock data and requirement
+  budgetCategoryId?: string;
   serviceName: string;
   serviceDetails?: string; 
   unitOfMeasure: string; 

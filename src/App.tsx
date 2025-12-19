@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, List, Plus, Layers, Settings as SettingsIcon, ChevronDown, User as UserIcon, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, Plus, Layers, Settings as SettingsIcon, ChevronDown, LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import OrderList from './components/OrderList';
 import OrderForm from './components/OrderForm';
@@ -72,21 +72,24 @@ function App() {
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800">
+      {/* Sidebar Nexus Order */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10 hidden md:flex">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="bg-blue-600 p-2 rounded-lg"><Layers className="text-white h-6 w-6" /></div>
             <div>
-                <h1 className="text-xl font-bold tracking-tight">Nexus ERP</h1>
-                <p className="text-xs text-slate-500">Sales App</p>
+                <h1 className="text-xl font-bold tracking-tight">Nexus Order</h1>
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Sales App</p>
             </div>
           </div>
         </div>
+        
         <nav className="flex-1 p-4 space-y-2">
           <button onClick={() => setCurrentView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20} /> <span className="font-medium">Dashboard</span></button>
           <button onClick={() => setCurrentView('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><List size={20} /> <span className="font-medium">Pedidos</span></button>
           <button onClick={() => setCurrentView('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === 'settings' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><SettingsIcon size={20} /> <span className="font-medium">Configuración</span></button>
         </nav>
+
         <div className="p-4 border-t border-slate-800 relative">
           <div className="bg-slate-800 rounded-lg p-3 cursor-pointer hover:bg-slate-700 transition-colors" onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}>
             <div className="flex items-center justify-between">
@@ -98,12 +101,13 @@ function App() {
             </div>
           </div>
           {isUserMenuOpen && (
-              <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-lg shadow-xl py-1 overflow-hidden z-20 border border-gray-200">
+              <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-lg shadow-xl py-1 overflow-hidden z-20 border border-gray-200 text-gray-800">
                   <button onClick={() => { setActiveUser(null); setIsUserMenuOpen(false); }} className="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 font-medium"><LogOut size={14} /> Cerrar Sesión</button>
               </div>
           )}
         </div>
       </aside>
+
       <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto relative h-screen bg-gray-50">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="text-2xl font-bold text-gray-900">
@@ -117,14 +121,23 @@ function App() {
             </button>
           )}
         </div>
+        
         <div className={`pb-10 h-full flex flex-col ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
            {currentView === 'dashboard' && <Dashboard orders={orders} />}
            {currentView === 'orders' && <OrderList orders={orders} onEdit={handleEditOrder} onDelete={handleDeleteOrder} currentUser={activeUser} />}
            {currentView === 'settings' && <Settings currentUser={activeUser} />}
         </div>
+
         {isLoading && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"><div className="bg-black/20 p-4 rounded-full backdrop-blur-sm"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div></div></div>}
       </main>
-      <OrderForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSubmit={handleCreateOrder} initialData={editingOrder} currentUser={activeUser} />
+
+      <OrderForm 
+        isOpen={isFormOpen} 
+        onClose={() => setIsFormOpen(false)} 
+        onSubmit={handleCreateOrder} 
+        initialData={editingOrder} 
+        currentUser={activeUser} 
+      />
     </div>
   );
 }

@@ -134,6 +134,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         setAttachments([]);
         setProgressLogs([]);
     }
+    setEditingLogId(null);
   }, [initialData, isOpen, workflow, units]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -236,12 +237,18 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
   if (!isOpen) return null;
 
+  const totalProduced = progressLogs.reduce((acc, log) => acc + log.quantity, 0);
+  const progressPercent = formData.quantity > 0 ? Math.min((totalProduced / formData.quantity) * 100, 100) : 0;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto text-gray-800">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white rounded-t-xl sticky top-0 z-10">
-          <h2 className="text-xl font-bold text-gray-800">{initialData ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full"><X size={20} /></button>
+          <div>
+              <h2 className="text-xl font-bold">{initialData ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
+              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.5</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full transition-colors"><X size={20} /></button>
         </div>
 
         <div className="bg-white px-6 pt-4 border-b border-gray-100">
@@ -256,56 +263,92 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           {loadingData ? <div className="p-12 text-center"><Loader2 className="animate-spin text-blue-600 mx-auto w-8 h-8"/></div> : (
           <form id="orderForm" onSubmit={handleSubmit}>
             <div className={activeTab === 'general' ? 'block' : 'hidden'}>
+                {!initialData && (
+                    <div className="mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex flex-col gap-2 shadow-sm">
+                        <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm"><Sparkles size={16} /> <span>AI Smart Assist</span></div>
+                        <div className="flex gap-2">
+                            <input type="text" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Ej: Servicio Java para Banco Futuro por 100 horas..." className="flex-1 text-sm border-indigo-200 focus:ring-indigo-500 rounded-md py-2 px-3 bg-white" />
+                            <button type="button" onClick={handleAiAssist} disabled={isThinking || !aiPrompt} className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-bold shadow-sm">{isThinking ? <Loader2 className="animate-spin" size={16} /> : 'Analizar'}</button>
+                        </div>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha Pedido</label><input type="date" name="date" required value={formData.date} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-gray-50" /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Estado</label><select name="status" value={formData.status} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5">{workflow.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">OC / PO</label><input type="text" name="poNumber" value={formData.poNumber} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5" /></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label><select name="clientId" required value={formData.clientId} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5">{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                    <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Servicio</label><input list="services-list" name="serviceName" required value={formData.serviceName} onChange={handleServiceSelect} className="w-full border-gray-300 rounded-lg p-2.5" /><datalist id="services-list">{availableServices.map((s, idx) => (<option key={idx} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>))}</datalist></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label><input type="number" step="0.01" name="quantity" required value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5" /></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Unitario</label><input type="number" step="0.01" name="unitPrice" required value={formData.unitPrice} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5" /></div>
-                    <div className="col-span-1 md:col-span-3"><label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label><textarea name="observations" rows={3} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 text-sm"></textarea></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Estado</label><select name="status" value={formData.status} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm">{workflow.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">OC / PO</label><input type="text" name="poNumber" value={formData.poNumber} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" placeholder="Ej: OC-12345" /></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label><select name="clientId" required value={formData.clientId} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm">{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                    <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Servicio</label><input list="services-list" name="serviceName" required value={formData.serviceName} onChange={handleServiceSelect} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" placeholder="Seleccione un servicio..." /><datalist id="services-list">{availableServices.map((s, idx) => (<option key={idx} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>))}</datalist></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cantidad Total</label><input type="number" step="0.01" name="quantity" required value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" /></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Precio Unitario</label><input type="number" step="0.01" name="unitPrice" required value={formData.unitPrice} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" /></div>
+                    <div className="col-span-1 md:col-span-3"><label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label><textarea name="observations" rows={3} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 text-sm bg-white shadow-sm"></textarea></div>
                 </div>
             </div>
 
             <div className={activeTab === 'admin' ? 'block' : 'hidden'}>
                 <div className="bg-amber-50 p-5 rounded-xl border border-amber-100 mb-6">
-                    <h3 className="text-sm font-bold text-amber-800 mb-4 border-b border-amber-200 pb-2">Configuración Operativa</h3>
+                    <h3 className="text-sm font-bold text-amber-800 mb-4 border-b border-amber-200 pb-2">Configuración de Pedido</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div><label className="block text-xs font-bold text-amber-700 uppercase mb-1">Empresa Vendedora</label><select name="company" required value={formData.company} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white">{companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
-                        <div><label className="block text-xs font-bold text-amber-700 uppercase mb-1">Responsable Operaciones</label><input type="text" name="operationsRep" value={formData.operationsRep} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white" /></div>
-                        <div><label className="block text-xs font-bold text-amber-700 uppercase mb-1">Contratista</label><select name="contractorId" value={formData.contractorId} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white"><option value="">Interno</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                        <div><label className="block text-xs font-bold text-amber-700 uppercase mb-1">Responsable Operaciones</label><input type="text" name="operationsRep" value={formData.operationsRep} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white" placeholder="Nombre PM" /></div>
+                        <div className="col-span-1 md:col-span-2"><label className="block text-xs font-bold text-amber-700 uppercase mb-1">Contratista Asignado</label><select name="contractorId" value={formData.contractorId} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white"><option value="">Interno / Propio</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                     </div>
                 </div>
-                <div className="p-5 rounded-xl border border-gray-200 bg-white grid grid-cols-3 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">Fecha Compromiso</label><input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2" /></div>
+                <div className="p-5 rounded-xl border border-gray-200 bg-white grid grid-cols-1 md:grid-cols-3 gap-4 shadow-sm">
+                    <div><label className="block text-xs font-bold text-gray-500 mb-1">F. Compromiso Entrega</label><input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2 text-sm" /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 mb-1">F. Certificación Cliente</label><input type="date" name="clientCertDate" value={formData.clientCertDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2 text-sm" /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 mb-1">F. Facturación</label><input type="date" name="billingDate" value={formData.billingDate} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2 text-sm" /></div>
                 </div>
             </div>
 
             <div className={activeTab === 'files' ? 'block' : 'hidden'}>
                 <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm mb-6">
-                    <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4"><Activity size={16} className="text-blue-500"/> Avance de Producción</h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2"><Activity size={16} className="text-blue-500"/> Avance de Producción Real</h3>
+                        <div className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">{totalProduced.toFixed(2)} / {formData.quantity.toFixed(2)} {formData.unitOfMeasure}</div>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-6 overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-500 ${progressPercent >= 100 ? 'bg-green-500' : 'bg-blue-600'}`} style={{ width: `${progressPercent}%` }}></div>
+                    </div>
+
                     <div className={`p-4 rounded-lg mb-6 border transition-colors ${editingLogId ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-100'}`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold uppercase text-gray-500">{editingLogId ? 'Modificar Registro' : 'Añadir Avance'}</span>
+                            {editingLogId && <button type="button" onClick={() => { setEditingLogId(null); setNewProgressQty(''); }} className="text-[10px] text-orange-600 font-bold flex items-center gap-1 hover:underline"><RotateCcw size={10}/> Cancelar</button>}
+                        </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 items-end">
-                            <div className="col-span-1"><label className="text-[10px] text-gray-500 mb-1 block">Fecha</label><input type="date" value={newProgressDate} onChange={e => setNewProgressDate(e.target.value)} className="w-full border rounded-md p-1.5 text-xs"/></div>
-                            <div className="col-span-1"><label className="text-[10px] text-gray-500 mb-1 block">Cant.</label><input type="number" value={newProgressQty} onChange={e => setNewProgressQty(e.target.value)} className="w-full border rounded-md p-1.5 text-xs"/></div>
-                            <div className="col-span-3"><label className="text-[10px] text-gray-500 mb-1 block">Nota</label><input type="text" value={newProgressNote} onChange={e => setNewProgressNote(e.target.value)} className="w-full border rounded-md p-1.5 text-xs"/></div>
-                            <div className="col-span-1"><button type="button" onClick={handleAddProgress} disabled={!newProgressQty} className={`w-full py-1.5 rounded-md text-white text-xs font-bold ${editingLogId ? 'bg-orange-600' : 'bg-blue-600'}`}>{editingLogId ? 'Actualizar' : 'Añadir'}</button></div>
+                            <div className="col-span-1"><label className="text-[10px] text-gray-500 mb-1 block">Fecha</label><input type="date" value={newProgressDate} onChange={e => setNewProgressDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-1.5 text-xs"/></div>
+                            <div className="col-span-1"><label className="text-[10px] text-gray-500 mb-1 block">Cantidad</label><input type="number" value={newProgressQty} onChange={e => setNewProgressQty(e.target.value)} className="w-full border border-gray-300 rounded-md p-1.5 text-xs font-bold"/></div>
+                            <div className="col-span-3"><label className="text-[10px] text-gray-500 mb-1 block">Nota de Seguimiento</label><input type="text" value={newProgressNote} onChange={e => setNewProgressNote(e.target.value)} className="w-full border border-gray-300 rounded-md p-1.5 text-xs" placeholder="¿Qué se completó?"/></div>
+                            <div className="col-span-1"><button type="button" onClick={handleAddProgress} disabled={!newProgressQty} className={`w-full py-1.5 rounded-md text-white text-xs font-bold shadow-sm transition-colors ${editingLogId ? 'bg-orange-600' : 'bg-blue-600'}`}>{editingLogId ? 'Actualizar' : 'Añadir'}</button></div>
                         </div>
                     </div>
+                    
                     {progressLogs.length > 0 && (
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <tbody className="divide-y divide-gray-200 text-xs">
-                                {progressLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-gray-50">
-                                        <td className="px-3 py-3 text-gray-600">{log.date}</td>
-                                        <td className="px-3 py-3 font-bold text-gray-900">{log.quantity}</td>
-                                        <td className="px-3 py-3 text-gray-500">{log.notes || '-'}</td>
-                                        <td className="px-3 py-3 text-right"><button type="button" onClick={() => handleEditLog(log)} className="text-blue-600 p-1"><Edit2 size={14} /></button></td>
+                        <div className="border border-gray-100 rounded-lg overflow-hidden shadow-sm">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Fecha</th>
+                                        <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Cantidad</th>
+                                        <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Nota</th>
+                                        <th className="px-3 py-2"></th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 text-xs bg-white">
+                                    {progressLogs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-3 py-3 text-gray-600 font-medium">{log.date}</td>
+                                            <td className="px-3 py-3 font-bold text-gray-900 text-right">{log.quantity.toLocaleString()}</td>
+                                            <td className="px-3 py-3 text-gray-500 italic truncate max-w-[200px]">{log.notes || '-'}</td>
+                                            <td className="px-3 py-3 text-right">
+                                                <button type="button" onClick={() => handleEditLog(log)} className="text-blue-600 p-1 hover:bg-blue-50 rounded transition-colors"><Edit2 size={14} /></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
             </div>
@@ -313,11 +356,14 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           )}
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex justify-between items-center bg-white rounded-b-xl">
-          <div className="text-xs text-gray-500 font-medium">Total Pedido: <span className="text-gray-900 font-bold text-sm">${(formData.quantity * formData.unitPrice).toLocaleString()}</span></div>
+        <div className="p-6 border-t border-gray-100 flex justify-between items-center bg-gray-50 rounded-b-xl shadow-inner">
+          <div className="text-xs text-gray-500 font-medium">Total Valorizado: <span className="text-gray-900 font-bold text-base ml-1">${(formData.quantity * formData.unitPrice).toLocaleString()}</span></div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg">Cancelar</button>
-            <button type="submit" form="orderForm" disabled={isSubmitting} className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2">{isSubmitting && <Loader2 className="animate-spin" size={16} />} {initialData ? 'Guardar Cambios' : 'Crear Pedido'}</button>
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">Cancelar</button>
+            <button type="submit" form="orderForm" disabled={isSubmitting} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md transition-all">
+                {isSubmitting && <Loader2 className="animate-spin" size={16} />} 
+                {initialData ? 'Guardar Cambios' : 'Generar Pedido'}
+            </button>
           </div>
         </div>
       </div>
