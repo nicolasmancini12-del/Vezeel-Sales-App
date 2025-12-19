@@ -48,8 +48,12 @@ function App() {
         setIsFormOpen(false);
         setEditingOrder(null);
     } catch (error: any) {
-        console.error("Save failed:", error);
-        alert(`No se pudo guardar el pedido: ${error.message || 'Error desconocido en la base de datos'}. Verifique si la tabla tiene todas las columnas necesarias.`);
+        console.error("Critical Save Failure:", error);
+        let msg = error.message || 'Error desconocido';
+        if (msg.includes('production_date')) {
+            msg = "La base de datos no tiene la columna 'production_date'. Por favor, añádela en Supabase SQL Editor: ALTER TABLE orders ADD COLUMN production_date TEXT;";
+        }
+        alert(`No se pudo guardar el pedido: ${msg}`);
     } finally {
         setIsLoading(false);
     }

@@ -55,7 +55,7 @@ export const getOrders = async (): Promise<Order[]> => {
         contractorName: d.contractor_name || '',
         operationsRep: d.operations_rep || '',
         commitmentDate: d.commitment_date || '',
-        productionDate: d.production_date || '',
+        productionDate: d.production_date || '', // Mapeo desde snake_case
         clientCertDate: d.client_cert_date || '',
         billingDate: d.billing_date || '',
         progressLogs: d.progress_logs || []
@@ -63,11 +63,11 @@ export const getOrders = async (): Promise<Order[]> => {
 };
 
 export const saveOrder = async (order: Order): Promise<Order[]> => {
-    // Limpieza profunda de datos para evitar undefined
+    // Transformación súper explícita para evitar errores de columna
     const dbOrder = {
              id: order.id, 
-             date: order.date || new Date().toISOString().split('T')[0], 
-             company: order.company || '',
+             date: order.date, 
+             company: order.company,
              client_id: order.clientId || null, 
              client_name: order.clientName || '', 
              po_number: order.poNumber || '',
@@ -85,7 +85,7 @@ export const saveOrder = async (order: Order): Promise<Order[]> => {
              operations_rep: order.operationsRep || '', 
              observations: order.observations || '',
              commitment_date: order.commitmentDate || null, 
-             production_date: order.productionDate || null,
+             production_date: order.productionDate || null, // Asegurar envío a snake_case
              client_cert_date: order.clientCertDate || null, 
              billing_date: order.billingDate || null,
              history: order.history || [], 
@@ -95,8 +95,8 @@ export const saveOrder = async (order: Order): Promise<Order[]> => {
     
     const { error } = await supabase.from('orders').upsert(dbOrder);
     if (error) {
-        console.error("Error crítico de guardado en Supabase:", error);
-        throw new Error(error.message);
+        console.error("Supabase Save Error:", error);
+        throw error;
     }
     return getOrders();
 };
@@ -108,42 +108,27 @@ export const deleteOrder = async (id: string): Promise<Order[]> => {
 
 export const getClients = async () => { const { data } = await supabase.from('clients').select('*').order('name'); return (data || []).map(d => ({id: d.id, name: d.name, taxId: d.tax_id, contactName: d.contact_name})); };
 export const saveClient = async (item: Client) => { await supabase.from('clients').upsert({ id: item.id, name: item.name, tax_id: item.taxId, contact_name: item.contactName }); return getClients(); };
-// Added missing deleteClient
 export const deleteClient = async (id: string) => { await supabase.from('clients').delete().eq('id', id); return getClients(); };
-
 export const getContractors = async () => { const { data } = await supabase.from('contractors').select('*').order('name'); return data || []; };
 export const saveContractor = async (item: Contractor) => { await supabase.from('contractors').upsert(item); return getContractors(); };
-// Added missing deleteContractor
 export const deleteContractor = async (id: string) => { await supabase.from('contractors').delete().eq('id', id); return getContractors(); };
-
 export const getCompanies = async () => { const { data } = await supabase.from('companies').select('*').order('name'); return data || []; };
 export const saveCompany = async (item: Company) => { await supabase.from('companies').upsert(item); return getCompanies(); };
-// Added missing deleteCompany
 export const deleteCompany = async (id: string) => { await supabase.from('companies').delete().eq('id', id); return getCompanies(); };
-
 export const getUsers = async () => { const { data } = await supabase.from('users').select('*').order('name'); return (data || []).map(u => ({id: u.id, name: u.name, role: u.role, initials: u.initials, accessCode: u.access_code})); };
 export const saveUser = async (item: User) => { await supabase.from('users').upsert({ id: item.id, name: item.name, role: item.role, initials: item.initials, access_code: item.accessCode }); return getUsers(); };
-// Added missing deleteUser
 export const deleteUser = async (id: string) => { await supabase.from('users').delete().eq('id', id); return getUsers(); };
-
 export const getWorkflow = async () => { const { data } = await supabase.from('workflow_statuses').select('*').order('order'); return data || []; };
 export const saveWorkflowStatus = async (item: WorkflowStatus) => { await supabase.from('workflow_statuses').upsert(item); return getWorkflow(); };
-// Added missing deleteWorkflowStatus
 export const deleteWorkflowStatus = async (id: string) => { await supabase.from('workflow_statuses').delete().eq('id', id); return getWorkflow(); };
-
 export const getUnits = async () => { const { data } = await supabase.from('units_of_measure').select('*').order('name'); return data || []; };
 export const saveUnit = async (item: UnitOfMeasure) => { await supabase.from('units_of_measure').upsert(item); return getUnits(); };
-// Added missing deleteUnit
 export const deleteUnit = async (id: string) => { await supabase.from('units_of_measure').delete().eq('id', id); return getUnits(); };
-
 export const getServices = async () => { const { data } = await supabase.from('service_catalog').select('*').order('name'); return data || []; };
 export const saveService = async (item: ServiceCatalogItem) => { await supabase.from('service_catalog').upsert(item); return getServices(); };
-// Added missing deleteService
 export const deleteService = async (id: string) => { await supabase.from('service_catalog').delete().eq('id', id); return getServices(); };
-
 export const getPriceList = async () => { const { data } = await supabase.from('price_list').select('*'); return (data || []).map(d => ({id: d.id, serviceName: d.service_name, company: d.company, contractorId: d.contractor_id, clientId: d.client_id, unitOfMeasure: d.unit_of_measure, unitPrice: d.unit_price, contractorCost: d.contractor_cost, validFrom: d.valid_from, validTo: d.valid_to})); };
 export const savePriceListEntry = async (entry: PriceListEntry) => { await supabase.from('price_list').upsert({ id: entry.id, service_name: entry.serviceName, company: entry.company, contractor_id: entry.contractorId, client_id: entry.clientId, unit_of_measure: entry.unitOfMeasure, unit_price: entry.unitPrice, contractor_cost: entry.contractorCost, valid_from: entry.validFrom, valid_to: entry.validTo }); return getPriceList(); };
-// Added missing deletePriceListEntry
 export const deletePriceListEntry = async (id: string) => { await supabase.from('price_list').delete().eq('id', id); return getPriceList(); };
 
 export const getBudgetCategories = async () => { const { data } = await supabase.from('budget_categories').select('*').order('name'); return data || []; };
