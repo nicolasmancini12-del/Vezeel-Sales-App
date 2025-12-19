@@ -1,4 +1,5 @@
 
+// Workflow status definition for dynamic configuration
 export interface WorkflowStatus {
   id: string;
   name: string;
@@ -6,22 +7,26 @@ export interface WorkflowStatus {
   order: number;
 }
 
+// Company entity definition
 export interface Company {
   id: string;
   name: string;
 }
 
+// Unit of measure entity
 export interface UnitOfMeasure {
   id: string;
   name: string;
 }
 
+// Service catalog for master data management
 export interface ServiceCatalogItem {
   id: string;
   name: string;
   category?: string;
 }
 
+// User entity for authentication and roles
 export interface User {
   id: string;
   name: string;
@@ -30,6 +35,7 @@ export interface User {
   accessCode?: string;
 }
 
+// Client entity for sales management
 export interface Client {
   id: string;
   name: string;
@@ -37,6 +43,7 @@ export interface Client {
   contactName?: string;
 }
 
+// Contractor entity for service fulfillment
 export interface Contractor {
   id: string;
   name: string;
@@ -44,6 +51,7 @@ export interface Contractor {
   company?: string; 
 }
 
+// Price list configuration for services
 export interface PriceListEntry {
   id: string;
   serviceName: string;
@@ -57,6 +65,7 @@ export interface PriceListEntry {
   validTo: string; 
 }
 
+// Audit history for orders
 export interface OrderHistoryEntry {
   date: string;
   user: string;
@@ -64,6 +73,7 @@ export interface OrderHistoryEntry {
   details: string;
 }
 
+// External attachments linked to orders
 export interface Attachment {
   id: string;
   name: string;
@@ -71,17 +81,18 @@ export interface Attachment {
   date: string;
 }
 
+// Production progress tracking
 export interface ProgressLogEntry {
     id: string;
-    date: string;
+    date: string; // Fecha de Producción
     quantity: number;
-    certificationDate?: string;
-    billingDate?: string;
+    certificationDate?: string; // Fecha Certificación del avance
+    billingDate?: string;       // Fecha Facturación del avance
     notes: string;
     user: string;
 }
 
-// Add Budget related interfaces
+// Budget category for financial planning
 export interface BudgetCategory {
   id: string;
   name: string;
@@ -89,32 +100,34 @@ export interface BudgetCategory {
   assignedCompanyIds?: string[];
 }
 
+// Budget entry for a specific month and category
 export interface BudgetEntry {
   id: string;
   companyId: string;
   categoryId: string;
-  monthDate: string; // ISO format YYYY-MM-01
+  monthDate: string; // ISO format YYYY-MM-DD
   quantity: number;
   unitValue: number;
   amount: number;
 }
 
+// Exchange rate configuration per month
 export interface ExchangeRate {
   id: string;
   year: number;
-  month: number;
+  month: number; // 0-11
   rate: number;
 }
 
+// Main Order entity
 export interface Order {
   id: string;
-  date: string;
+  date: string; // Fecha Registro
   company: string; 
   clientId: string; 
   clientName: string; 
   poNumber: string; 
-  // Added budgetCategoryId to match mock data and requirement
-  budgetCategoryId?: string;
+  budgetCategoryId?: string; // Link to budget category
   serviceName: string;
   serviceDetails?: string; 
   unitOfMeasure: string; 
@@ -127,9 +140,13 @@ export interface Order {
   status: string; 
   operationsRep: string; 
   observations: string;
+  
+  // FECHAS CABECERA
   commitmentDate?: string; 
+  productionDate?: string; // Nueva: Fecha estimada/real producción total
   clientCertDate?: string; 
   billingDate?: string;    
+  
   history?: OrderHistoryEntry[];
   attachments?: Attachment[];
   progressLogs?: ProgressLogEntry[];
