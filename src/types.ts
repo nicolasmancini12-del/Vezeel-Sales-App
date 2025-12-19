@@ -143,7 +143,6 @@ export interface Order {
   
   // FECHAS CABECERA
   commitmentDate?: string; 
-  productionDate?: string; // Nueva: Fecha estimada/real producción total
   clientCertDate?: string; 
   billingDate?: string;    
   

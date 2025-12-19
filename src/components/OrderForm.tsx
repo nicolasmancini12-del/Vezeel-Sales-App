@@ -26,7 +26,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   const [availableServices, setAvailableServices] = useState<PriceListEntry[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<OrderFormData & { commitmentDate: string; productionDate: string; clientCertDate: string; billingDate: string, unitCost?: number }>({
+  const [formData, setFormData] = useState<OrderFormData & { commitmentDate: string; clientCertDate: string; billingDate: string, unitCost?: number }>({
     date: new Date().toISOString().split('T')[0],
     company: '',
     clientId: '',
@@ -42,7 +42,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     operationsRep: '',
     observations: '',
     commitmentDate: '',
-    productionDate: '',
     clientCertDate: '',
     billingDate: ''
   });
@@ -92,7 +91,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           ...rest,
           unitCost: initialData.unitCost || 0,
           commitmentDate: initialData.commitmentDate || '',
-          productionDate: initialData.productionDate || '',
           clientCertDate: initialData.clientCertDate || '',
           billingDate: initialData.billingDate || ''
       });
@@ -116,7 +114,6 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
             operationsRep: '',
             observations: '',
             commitmentDate: '',
-            productionDate: '',
             clientCertDate: '',
             billingDate: ''
         }));
@@ -230,7 +227,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white rounded-t-xl sticky top-0 z-10">
           <div>
               <h2 className="text-xl font-bold">{initialData ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
-              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.6.2 Core</p>
+              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.6.3 Core</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full transition-colors"><X size={20} /></button>
         </div>
@@ -278,9 +275,8 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
             <div className={activeTab === 'admin' ? 'block' : 'hidden'}>
                 <div className="bg-amber-50 p-6 rounded-xl border border-amber-100 mb-6 shadow-sm">
                     <h3 className="text-sm font-bold text-amber-800 mb-4 border-b border-amber-200 pb-2 flex items-center gap-2"><Calendar className="text-amber-600" size={18}/> Hitos del Proyecto (Cabecera)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div><label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">F. Compromiso Entrega</label><input type="date" name="commitmentDate" value={formData.commitmentDate} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white text-sm" /></div>
-                        <div><label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">F. Producción Final</label><input type="date" name="productionDate" value={formData.productionDate} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white text-sm" /></div>
                         <div><label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">F. Certificación Cliente</label><input type="date" name="clientCertDate" value={formData.clientCertDate} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white text-sm" /></div>
                         <div><label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">F. Facturación Orden</label><input type="date" name="billingDate" value={formData.billingDate} onChange={handleChange} className="w-full border-amber-200 rounded-lg p-2.5 bg-white text-sm" /></div>
                     </div>

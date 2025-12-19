@@ -55,7 +55,6 @@ export const getOrders = async (): Promise<Order[]> => {
         contractorName: d.contractor_name || '',
         operationsRep: d.operations_rep || '',
         commitmentDate: d.commitment_date || '',
-        productionDate: d.production_date || '', // Mapeo desde snake_case
         clientCertDate: d.client_cert_date || '',
         billingDate: d.billing_date || '',
         progressLogs: d.progress_logs || []
@@ -63,7 +62,7 @@ export const getOrders = async (): Promise<Order[]> => {
 };
 
 export const saveOrder = async (order: Order): Promise<Order[]> => {
-    // Transformación súper explícita para evitar errores de columna
+    // Se elimina la referencia a production_date para evitar errores de columna no encontrada
     const dbOrder = {
              id: order.id, 
              date: order.date, 
@@ -85,7 +84,6 @@ export const saveOrder = async (order: Order): Promise<Order[]> => {
              operations_rep: order.operationsRep || '', 
              observations: order.observations || '',
              commitment_date: order.commitmentDate || null, 
-             production_date: order.productionDate || null, // Asegurar envío a snake_case
              client_cert_date: order.clientCertDate || null, 
              billing_date: order.billingDate || null,
              history: order.history || [], 

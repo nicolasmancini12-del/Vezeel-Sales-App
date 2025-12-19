@@ -108,7 +108,6 @@ const OrderList: React.FC<Props> = ({ orders, onEdit, onDelete, currentUser }) =
             Estado: o.status,
             Responsable: o.operationsRep,
             FechaCompromiso: o.commitmentDate || '',
-            FechaProduccionCabecera: o.productionDate || '',
             FechaCertificacionCabecera: o.clientCertDate || '',
             FechaFacturacionCabecera: o.billingDate || '',
             Observaciones: o.observations
