@@ -1,18 +1,21 @@
+
 import { supabase } from '../supabaseClient';
 import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem, BudgetCategory, BudgetEntry, ExchangeRate } from '../types';
 import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE, MOCK_SERVICES } from '../constants';
 
-const queryWithRetry = async <T>(queryBuilder: any, retries = 3, delay = 1000): Promise<{ data: T | null, error: any }> => {
+// Corregimos la lógica de reintentos para que reciba una función que genere la consulta
+const queryWithRetry = async <T>(queryFn: () => any, retries = 3, delay = 1000): Promise<{ data: T | null, error: any }> => {
     for (let i = 0; i < retries; i++) {
-        const { data, error } = await queryBuilder;
-        if (!error) return { data, error: null };
-        if (i < retries - 1) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
+        try {
+            const { data, error } = await queryFn();
+            if (!error) return { data, error: null };
+            console.warn(`Intento ${i+1} fallido:`, error.message);
+        } catch (e: any) {
+            console.warn(`Error en intento ${i+1}:`, e.message);
         }
-        return { data: null, error };
+        if (i < retries - 1) await new Promise(resolve => setTimeout(resolve, delay));
     }
-    return { data: null, error: { message: "Retries exhausted." } };
+    return { data: null, error: { message: "Se agotaron los reintentos de conexión con la base de datos." } };
 };
 
 export const initDatabase = async () => {
@@ -42,12 +45,12 @@ export const initDatabase = async () => {
 };
 
 export const getOrders = async (): Promise<Order[]> => {
-    const { data, error } = await queryWithRetry<any[]>(supabase.from('orders').select('*').order('date', {ascending: false}));
+    const { data, error } = await queryWithRetry<any[]>(() => supabase.from('orders').select('*').order('date', {ascending: false}));
     if (error) {
         console.error("Error fetching orders:", error);
         return [];
     }
-    return data.map((d: any) => ({
+    return (data || []).map((d: any) => ({
         ...d,
         clientId: d.client_id,
         clientName: d.client_name,
@@ -100,8 +103,6 @@ export const saveOrder = async (order: Order): Promise<Order[]> => {
              progress_logs: order.progressLogs || []
     };
     
-    console.log("Attempting to save order to Supabase:", dbOrder);
-    
     const { error } = await supabase.from('orders').upsert(dbOrder);
     if (error) {
         console.error("Supabase Save Error:", error);
@@ -137,7 +138,6 @@ export const getServices = async () => { const { data } = await supabase.from('s
 export const saveService = async (item: ServiceCatalogItem) => { await supabase.from('service_catalog').upsert(item); return getServices(); };
 export const deleteService = async (id: string) => { await supabase.from('service_catalog').delete().eq('id', id); return getServices(); };
 
-// Corrected mapping in getPriceList to use validFrom and validTo camelCase properties to match the PriceListEntry interface.
 export const getPriceList = async () => { const { data } = await supabase.from('price_list').select('*'); return (data || []).map(d => ({id: d.id, serviceName: d.service_name, company: d.company, contractorId: d.contractor_id, clientId: d.client_id, unitOfMeasure: d.unit_of_measure, unitPrice: d.unit_price, contractorCost: d.contractor_cost, validFrom: d.valid_from, validTo: d.valid_to})); };
 export const savePriceListEntry = async (entry: PriceListEntry) => { await supabase.from('price_list').upsert({ id: entry.id, service_name: entry.serviceName, company: entry.company, contractor_id: entry.contractorId, client_id: entry.clientId, unit_of_measure: entry.unitOfMeasure, unit_price: entry.unitPrice, contractor_cost: entry.contractorCost, valid_from: entry.validFrom, valid_to: entry.validTo }); return getPriceList(); };
 export const deletePriceListEntry = async (id: string) => { await supabase.from('price_list').delete().eq('id', id); return getPriceList(); };

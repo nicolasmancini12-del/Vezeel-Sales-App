@@ -144,16 +144,19 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   const handleAiAssist = async () => {
     if (!aiPrompt.trim()) return;
     setIsThinking(true);
-    const result = await analyzeTextForOrder(aiPrompt);
-    if (result) {
-        let foundClientId = formData.clientId;
-        if (result.client) {
-            const clientMatch = clients.find(c => c.name.toLowerCase().includes(result.client.toLowerCase()));
-            if (clientMatch) foundClientId = clientMatch.id;
+    try {
+        const result = await analyzeTextForOrder(aiPrompt);
+        if (result) {
+            let foundClientId = formData.clientId;
+            if (result.client) {
+                const clientMatch = clients.find(c => c.name.toLowerCase().includes(result.client.toLowerCase()));
+                if (clientMatch) foundClientId = clientMatch.id;
+            }
+            setFormData(prev => ({ ...prev, clientId: foundClientId, serviceName: result.serviceName || prev.serviceName, unitOfMeasure: result.unitOfMeasure || prev.unitOfMeasure, quantity: result.quantity ? parseFloat(result.quantity) : prev.quantity, observations: result.observations || prev.observations, poNumber: result.poNumber || prev.poNumber }));
         }
-        setFormData(prev => ({ ...prev, clientId: foundClientId, serviceName: result.serviceName || prev.serviceName, unitOfMeasure: result.unitOfMeasure || prev.unitOfMeasure, quantity: result.quantity ? parseFloat(result.quantity) : prev.quantity, observations: result.observations || prev.observations, poNumber: result.poNumber || prev.poNumber }));
+    } finally {
+        setIsThinking(false);
     }
-    setIsThinking(false);
   };
 
   const handleAddProgress = () => {
@@ -181,19 +184,26 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    
     setIsSubmitting(true);
-    const orderToSave: Order = {
-      ...formData,
-      id: initialData?.id || Math.random().toString(36).substr(2, 9),
-      clientName: clients.find(c => c.id === formData.clientId)?.name || 'Cliente',
-      contractorName: contractors.find(c => c.id === formData.contractorId)?.name || 'Sin Asignar',
-      totalValue: formData.quantity * formData.unitPrice,
-      history: history,
-      attachments: attachments,
-      progressLogs: progressLogs
-    };
-    await onSubmit(orderToSave);
-    setIsSubmitting(false);
+    try {
+        const orderToSave: Order = {
+          ...formData,
+          id: initialData?.id || Math.random().toString(36).substr(2, 9),
+          clientName: clients.find(c => c.id === formData.clientId)?.name || 'Cliente',
+          contractorName: contractors.find(c => c.id === formData.contractorId)?.name || 'Sin Asignar',
+          totalValue: formData.quantity * formData.unitPrice,
+          history: history,
+          attachments: attachments,
+          progressLogs: progressLogs
+        };
+        await onSubmit(orderToSave);
+    } catch (err) {
+        console.error("Error submitting form:", err);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const totalProduced = progressLogs.reduce((acc, log) => acc + log.quantity, 0);
@@ -207,16 +217,16 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white rounded-t-xl sticky top-0 z-10">
           <div>
               <h2 className="text-xl font-bold">{initialData ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
-              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.6</p>
+              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.6 Core</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full transition-colors"><X size={20} /></button>
         </div>
 
         <div className="bg-white px-6 pt-4 border-b border-gray-100">
             <div className="flex gap-1">
-                <button onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-t border-x ${activeTab === 'general' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><Briefcase size={16} className="inline mr-2"/>General</button>
-                <button onClick={() => setActiveTab('admin')} className={`px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-t border-x ${activeTab === 'admin' ? 'bg-amber-600 text-white border-amber-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><Settings size={16} className="inline mr-2"/>Administración Hitos</button>
-                <button onClick={() => setActiveTab('files')} className={`px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-t border-x ${activeTab === 'files' ? 'bg-purple-600 text-white border-purple-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><PaperclipIcon size={16} className="inline mr-2"/>Producción y Docs</button>
+                <button type="button" onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-t border-x ${activeTab === 'general' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><Briefcase size={16} className="inline mr-2"/>General</button>
+                <button type="button" onClick={() => setActiveTab('admin')} className={`px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-t border-x ${activeTab === 'admin' ? 'bg-amber-600 text-white border-amber-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><Settings size={16} className="inline mr-2"/>Administración Hitos</button>
+                <button type="button" onClick={() => setActiveTab('files')} className={`px-6 py-3 text-sm font-bold rounded-t-lg transition-all border-t border-x ${activeTab === 'files' ? 'bg-purple-600 text-white border-purple-600' : 'bg-gray-50 text-gray-500 border-gray-200'}`}><PaperclipIcon size={16} className="inline mr-2"/>Producción y Docs</button>
             </div>
         </div>
 
@@ -333,8 +343,8 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           <div className="text-xs text-gray-500 font-medium uppercase tracking-widest">Total Venta Estimado: <span className="text-gray-900 font-black text-xl ml-1 tracking-normal">${(formData.quantity * formData.unitPrice).toLocaleString()}</span></div>
           <div className="flex gap-3">
             <button type="button" onClick={onClose} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-100 transition-all shadow-sm">Descartar</button>
-            <button type="submit" form="orderForm" disabled={isSubmitting} className="px-10 py-2.5 text-sm font-black text-white bg-blue-600 rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:scale-95">
-                {isSubmitting && <Loader2 className="animate-spin" size={16} />} 
+            <button type="submit" form="orderForm" disabled={isSubmitting} className="px-10 py-2.5 text-sm font-black text-white bg-blue-600 rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-70">
+                {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : null} 
                 {initialData ? 'Guardar Cambios' : 'Generar Pedido'}
             </button>
           </div>
