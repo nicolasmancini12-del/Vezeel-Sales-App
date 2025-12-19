@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Order, OrderFormData, Client, Contractor, PriceListEntry, Company, WorkflowStatus, UnitOfMeasure, User, OrderHistoryEntry, Attachment, ProgressLogEntry } from '../types';
-import { X, Sparkles, Loader2, Link as LinkIcon, ExternalLink, Trash2, Plus, Activity, Briefcase, Settings, Paperclip as PaperclipIcon, Edit2, RotateCcw, Check, Calendar, Receipt, FileCheck } from 'lucide-react';
+import { X, Sparkles, Loader2, Link as LinkIcon, ExternalLink, Trash2, Plus, Activity, Briefcase, Settings, Paperclip as PaperclipIcon, Edit2, RotateCcw, Check, Calendar, Receipt, FileCheck, AlertCircle } from 'lucide-react';
 import { analyzeTextForOrder } from '../services/geminiService';
 import { getClients, getContractors, getPriceList, getWorkflow, getUnits, getCompanies } from '../services/storageService';
 
@@ -24,6 +24,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
   
   const [loadingData, setLoadingData] = useState(false);
   const [availableServices, setAvailableServices] = useState<PriceListEntry[]>([]);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<OrderFormData & { commitmentDate: string; productionDate: string; clientCertDate: string; billingDate: string, unitCost?: number }>({
     date: new Date().toISOString().split('T')[0],
@@ -65,6 +66,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
     if (isOpen) {
         setLoadingData(true);
         setActiveTab('general');
+        setValidationError(null);
         Promise.all([
             getClients(), getContractors(), getPriceList(), getWorkflow(), getUnits(), getCompanies()
         ]).then(([cl, co, pl, wf, un, com]) => {
@@ -129,6 +131,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         ...prev,
         [name]: name === 'quantity' || name === 'unitPrice' ? parseFloat(value) || 0 : value
     }));
+    if (validationError) setValidationError(null);
   };
 
   const handleServiceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,11 +185,20 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
       setActiveTab('files');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validate = () => {
+      if (!formData.clientId) { setActiveTab('general'); setValidationError('Debe seleccionar un cliente.'); return false; }
+      if (!formData.serviceName) { setActiveTab('general'); setValidationError('Debe ingresar un nombre de servicio.'); return false; }
+      if (formData.quantity <= 0) { setActiveTab('general'); setValidationError('La cantidad debe ser mayor a cero.'); return false; }
+      if (!formData.company) { setActiveTab('admin'); setValidationError('Debe seleccionar una empresa vendedora.'); return false; }
+      return true;
+  };
+
+  const handleManualSubmit = async () => {
     if (isSubmitting) return;
+    if (!validate()) return;
     
     setIsSubmitting(true);
+    setValidationError(null);
     try {
         const orderToSave: Order = {
           ...formData,
@@ -199,8 +211,9 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           progressLogs: progressLogs
         };
         await onSubmit(orderToSave);
-    } catch (err) {
+    } catch (err: any) {
         console.error("Error submitting form:", err);
+        setValidationError(`Error al guardar: ${err.message}`);
     } finally {
         setIsSubmitting(false);
     }
@@ -217,7 +230,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white rounded-t-xl sticky top-0 z-10">
           <div>
               <h2 className="text-xl font-bold">{initialData ? 'Editar Pedido' : 'Nuevo Pedido'}</h2>
-              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.6 Core</p>
+              <p className="text-xs text-gray-400 font-medium tracking-tight">Nexus Order v1.6.2 Core</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full transition-colors"><X size={20} /></button>
         </div>
@@ -231,8 +244,14 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 bg-white">
+          {validationError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2 text-sm animate-fade-in">
+                  <AlertCircle size={18} /> {validationError}
+              </div>
+          )}
+
           {loadingData ? <div className="p-12 text-center"><Loader2 className="animate-spin text-blue-600 mx-auto w-8 h-8"/></div> : (
-          <form id="orderForm" onSubmit={handleSubmit}>
+          <form id="orderForm" onSubmit={(e) => e.preventDefault()}>
             <div className={activeTab === 'general' ? 'block' : 'hidden'}>
                 {!initialData && (
                     <div className="mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex flex-col gap-2 shadow-sm">
@@ -244,14 +263,14 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                     </div>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">F. Registro Sistema</label><input type="date" name="date" required value={formData.date} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-gray-50" /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">F. Registro Sistema</label><input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-gray-50" /></div>
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Estado Operativo</label><select name="status" value={formData.status} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm">{workflow.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></div>
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">OC / PO Number</label><input type="text" name="poNumber" value={formData.poNumber} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" placeholder="Ej: OC-12345" /></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cliente Solicitante</label><select name="clientId" required value={formData.clientId} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm"><option value="">Seleccione Cliente...</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                    <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Servicio (Tarifa Maestro)</label><input list="services-list" name="serviceName" required value={formData.serviceName} onChange={handleServiceSelect} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" placeholder="Seleccione un servicio del catálogo..." /><datalist id="services-list">{availableServices.map((s, idx) => (<option key={idx} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>))}</datalist></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cantidad Total</label><input type="number" step="0.01" name="quantity" required value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" /></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Unidad Medida</label><select name="unitOfMeasure" required value={formData.unitOfMeasure} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm">{units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}</select></div>
-                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Precio Unitario ($)</label><input type="number" step="0.01" name="unitPrice" required value={formData.unitPrice} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" /></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cliente Solicitante *</label><select name="clientId" value={formData.clientId} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm"><option value="">Seleccione Cliente...</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                    <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Servicio (Tarifa Maestro) *</label><input list="services-list" name="serviceName" value={formData.serviceName} onChange={handleServiceSelect} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" placeholder="Seleccione un servicio del catálogo..." /><datalist id="services-list">{availableServices.map((s, idx) => (<option key={idx} value={s.serviceName}>{`$${s.unitPrice} / ${s.unitOfMeasure}`}</option>))}</datalist></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Cantidad Total *</label><input type="number" step="0.01" name="quantity" value={formData.quantity} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" /></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Unidad Medida</label><select name="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm">{units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}</select></div>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Precio Unitario ($)</label><input type="number" step="0.01" name="unitPrice" value={formData.unitPrice} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 bg-white shadow-sm" /></div>
                     <div className="col-span-1 md:col-span-3"><label className="block text-sm font-medium text-gray-700 mb-1">Observaciones / Alcance</label><textarea name="observations" rows={3} value={formData.observations} onChange={handleChange} className="w-full border-gray-300 rounded-lg p-2.5 text-sm bg-white shadow-sm"></textarea></div>
                 </div>
             </div>
@@ -267,7 +286,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
                     </div>
                 </div>
                 <div className="p-6 rounded-xl border border-gray-100 bg-white grid grid-cols-1 md:grid-cols-2 gap-6 shadow-sm">
-                    <div><label className="block text-xs font-bold text-gray-400 uppercase mb-1">Empresa Vendedora</label><select name="company" required value={formData.company} onChange={handleChange} className="w-full border-gray-200 rounded-lg p-2.5 bg-gray-50 text-sm font-bold">{companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+                    <div><label className="block text-xs font-bold text-gray-400 uppercase mb-1">Empresa Vendedora *</label><select name="company" value={formData.company} onChange={handleChange} className="w-full border-gray-200 rounded-lg p-2.5 bg-gray-50 text-sm font-bold">{companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
                     <div><label className="block text-xs font-bold text-gray-400 uppercase mb-1">Responsable Operaciones (PM)</label><input type="text" name="operationsRep" value={formData.operationsRep} onChange={handleChange} className="w-full border-gray-200 rounded-lg p-2.5 bg-gray-50 text-sm" placeholder="Nombre Responsable" /></div>
                     <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-400 uppercase mb-1">Contratista Asignado</label><select name="contractorId" value={formData.contractorId} onChange={handleChange} className="w-full border-gray-200 rounded-lg p-2.5 bg-white text-sm shadow-inner"><option value="">Interno / Propio</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 </div>
@@ -343,7 +362,7 @@ const OrderForm: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData, cu
           <div className="text-xs text-gray-500 font-medium uppercase tracking-widest">Total Venta Estimado: <span className="text-gray-900 font-black text-xl ml-1 tracking-normal">${(formData.quantity * formData.unitPrice).toLocaleString()}</span></div>
           <div className="flex gap-3">
             <button type="button" onClick={onClose} disabled={isSubmitting} className="px-6 py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-100 transition-all shadow-sm">Descartar</button>
-            <button type="submit" form="orderForm" disabled={isSubmitting} className="px-10 py-2.5 text-sm font-black text-white bg-blue-600 rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-70">
+            <button type="button" onClick={handleManualSubmit} disabled={isSubmitting} className="px-10 py-2.5 text-sm font-black text-white bg-blue-600 rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-70 min-w-[180px]">
                 {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : null} 
                 {initialData ? 'Guardar Cambios' : 'Generar Pedido'}
             </button>
