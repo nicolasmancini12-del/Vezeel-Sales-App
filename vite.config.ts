@@ -4,8 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: true, // Esto permite que el servidor escuche en todas las interfaces locales
+    port: 5173
+  },
   define: {
-    // Esto previene el error "process is not defined" en el navegador
     'process.env': {}
   }
 })

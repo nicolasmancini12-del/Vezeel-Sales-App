@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabaseClient';
 import { Order, Client, Contractor, PriceListEntry, Company, User, WorkflowStatus, UnitOfMeasure, ServiceCatalogItem } from '../types';
 import { MOCK_ORDERS, MOCK_CLIENTS, MOCK_CONTRACTORS, MOCK_PRICE_LIST, MOCK_COMPANIES, MOCK_USERS, DEFAULT_WORKFLOW, UNITS_OF_MEASURE, MOCK_SERVICES } from '../constants';
@@ -277,8 +276,8 @@ export const getPriceList = async (): Promise<PriceListEntry[]> => {
         unitOfMeasure: d.unit_of_measure,
         unitPrice: d.unit_price,
         contractorCost: d.contractor_cost,
-        valid_from: d.valid_from,
-        valid_to: d.valid_to
+        validFrom: d.valid_from,
+        validTo: d.valid_to
     }));
 };
 export const savePriceListEntry = async (entry: PriceListEntry) => {

@@ -1,12 +1,13 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const analyzeTextForOrder = async (text: string) => {
-  // Use the pre-configured API key from environment variables as per guidelines
+  // Inicialización segura usando la variable de entorno obligatoria
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-flash-preview", // Modelo recomendado para tareas de extracción
       contents: `Extract service order details from this text: "${text}". If a field is missing, leave it null or imply a reasonable default based on context.`,
       config: {
         responseMimeType: "application/json",
@@ -24,7 +25,7 @@ export const analyzeTextForOrder = async (text: string) => {
       },
     });
 
-    // Access the text property directly from the response
+    // Acceso correcto a la propiedad .text (no es un método)
     if (response.text) {
       return JSON.parse(response.text);
     }
